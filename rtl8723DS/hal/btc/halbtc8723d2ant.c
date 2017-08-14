@@ -3076,18 +3076,19 @@ void halbtc8723d2ant_action_hid_a2dp(IN struct btc_coexist *btcoexist)
 			if (coex_sta->hid_busy_num >= 2) {
 				halbtc8723d2ant_coex_table_with_type(btcoexist,
 								 NORMAL_EXEC, 8);
-				if (wifi_bw == 0)  /*11bg mode */
+				if (wifi_bw == 0)  /*11bg mode */ {
 					halbtc8723d2ant_set_wltoggle_coex_table(btcoexist,
 								NORMAL_EXEC,
 								0x1, 0xaa,
 								0x5a, 0xaa,
 								0xaa);
-				else
+				} else {
 					halbtc8723d2ant_set_wltoggle_coex_table(btcoexist,
 								NORMAL_EXEC,
 								0x2, 0xaa,
 								0x5a, 0xaa,
 								0xaa);
+				}
 					halbtc8723d2ant_ps_tdma(btcoexist, NORMAL_EXEC, true,
 							109);
 			} else {

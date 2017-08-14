@@ -3298,13 +3298,14 @@ for (i = 0; i < 3; i++) {
 				final_candidate = 1;
 				ODM_RT_TRACE(pDM_Odm,ODM_COMP_CALIBRATION, ODM_DBG_LOUD, ("IQK: is23simular final_candidate is %x\n",final_candidate));				
 			} else {
-				for (i = 0; i < 8; i++)
+				for (i = 0; i < 8; i++) {
 					RegTmp += result[3][i];
-				
-					if (RegTmp != 0)
+				}
+					if (RegTmp != 0) {
 						final_candidate = 3;
-					else
+					} else {
 						final_candidate = 0xFF;
+					}
 
 			}
 		}
@@ -3370,8 +3371,9 @@ for (i = 0; i < 3; i++) {
 
 
 	if (final_candidate < 4) {
-		for (i = 0; i < IQK_Matrix_REG_NUM; i++)
+		for (i = 0; i < IQK_Matrix_REG_NUM; i++) {
 			pDM_Odm->RFCalibrateInfo.IQKMatrixRegSetting[Indexforchannel].Value[0][i] = result[final_candidate][i];
+		}
 			pDM_Odm->RFCalibrateInfo.IQKMatrixRegSetting[Indexforchannel].bIQKDone = TRUE;		
 	}
 	
