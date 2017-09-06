@@ -307,9 +307,7 @@
 /*#define CONFIG_DOSCAN_IN_BUSYTRAFFIC	*/
 
 /*Don't release SDIO irq in suspend/resume procedure*/
-#ifdef CONFIG_SDIO_HCI
-#define CONFIG_RTW_SDIO_KEEP_IRQ
-#endif
+#define CONFIG_RTW_SDIO_KEEP_IRQ	0
 
 /*
  * Add by Lucas@2016/02/15

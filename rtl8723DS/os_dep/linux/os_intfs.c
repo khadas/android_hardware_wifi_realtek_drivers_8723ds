@@ -3583,7 +3583,7 @@ int rtw_suspend_wow(_adapter *padapter)
 
 		/* 2.2 free irq */
 		/* sdio_free_irq(adapter_to_dvobj(padapter)); */
-#ifndef CONFIG_RTW_SDIO_KEEP_IRQ
+#if !(CONFIG_RTW_SDIO_KEEP_IRQ)
 		if (padapter->intf_free_irq)
 			padapter->intf_free_irq(adapter_to_dvobj(padapter));
 #endif
@@ -3767,10 +3767,6 @@ int rtw_suspend_normal(_adapter *padapter)
 	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
 	struct pwrctrl_priv *pwrpriv = adapter_to_pwrctl(padapter);
 	int ret = _SUCCESS;
-#ifdef CONFIG_RTW_SDIO_KEEP_IRQ
-	struct dvobj_priv *pdvobj = adapter_to_dvobj(padapter);
-	struct sdio_func *func = pdvobj->intf_data.func;
-#endif
 
 	RTW_INFO("==> "FUNC_ADPT_FMT" entry....\n", FUNC_ADPT_ARG(padapter));
 
@@ -3796,22 +3792,12 @@ int rtw_suspend_normal(_adapter *padapter)
 	rtw_dev_unload(padapter);
 
 	/* sdio_deinit(adapter_to_dvobj(padapter)); */
-#ifdef CONFIG_RTW_SDIO_KEEP_IRQ
-	if (func) { 
-		int err;	
-
-		sdio_claim_host(func);
-		err = sdio_disable_func(func);
-		if (err) {
-			pdvobj->drv_dbg.dbg_sdio_deinit_error_cnt++;
-			RTW_INFO("%s: sdio_disable_func(%d)\n", __func__, err);
-		}
-
-		sdio_release_host(func);
-	}
-#else
 	if (padapter->intf_deinit)
 		padapter->intf_deinit(adapter_to_dvobj(padapter));
+
+#if !(CONFIG_RTW_SDIO_KEEP_IRQ)
+	if (padapter->intf_free_irq)
+		padapter->intf_free_irq(adapter_to_dvobj(padapter));
 #endif
 
 	RTW_INFO("<== "FUNC_ADPT_FMT" exit....\n", FUNC_ADPT_ARG(padapter));
@@ -3954,7 +3940,7 @@ int rtw_resume_process_wow(_adapter *padapter)
 		rtw_hal_clear_interrupt(padapter);
 #endif /* CONFIG_SDIO_HCI */
 
-#ifndef CONFIG_RTW_SDIO_KEEP_IRQ
+#if !(CONFIG_RTW_SDIO_KEEP_IRQ)
 		/* if (sdio_alloc_irq(adapter_to_dvobj(padapter)) != _SUCCESS) {		 */
 		if ((padapter->intf_alloc_irq) && (padapter->intf_alloc_irq(adapter_to_dvobj(padapter)) != _SUCCESS)) {
 			ret = -1;
@@ -4252,7 +4238,7 @@ int rtw_resume_process_normal(_adapter *padapter)
 		goto exit;
 	}
 	rtw_hal_disable_interrupt(padapter);
-#ifndef CONFIG_RTW_SDIO_KEEP_IRQ
+#if !(CONFIG_RTW_SDIO_KEEP_IRQ)
 	/* if (sdio_alloc_irq(adapter_to_dvobj(padapter)) != _SUCCESS) */
 	if ((padapter->intf_alloc_irq) && (padapter->intf_alloc_irq(adapter_to_dvobj(padapter)) != _SUCCESS)) {
 		ret = -1;

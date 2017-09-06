@@ -293,13 +293,14 @@ static u32 sdio_init(struct dvobj_priv *dvobj)
 	psdio_data->rx_block_mode = 1;
 	psdio_data->clock = func->card->host->ios.clock;
 	RTW_PRINT("%s: sdio clk rate: %d\n", __func__, psdio_data->clock);
-
+/*
 	if (dvobj->irq_alloc == 0) {
 		if (sdio_alloc_irq(dvobj) != _SUCCESS) {
 			RTW_ERR("%s: sdio_alloc_irq fail\n", __func__);
 			goto release;
 		}
-	}	
+	}
+*/
 
 release:
 	sdio_release_host(func);
@@ -797,6 +798,11 @@ static int rtw_drv_init(
 	rtd2885_wlan_netlink_sendMsg("linkup", "8712");
 #endif
 
+
+	if (sdio_alloc_irq(dvobj) != _SUCCESS)
+		goto os_ndevs_deinit;
+
+
 #ifdef CONFIG_GPIO_WAKEUP
 #ifdef CONFIG_PLATFORM_ARM_SUN6I
 	eint_wlan_handle = sw_gpio_irq_request(gpio_eint_wlan, TRIG_EDGE_NEGATIVE, (peint_handle)gpio_hostwakeup_irq_thread, NULL);
@@ -805,7 +811,7 @@ static int rtw_drv_init(
 		return -1;
 	}
 #else
-#ifndef RTW_ENABLE_WIFI_CONTROL_FUNC 
+#ifndef RTW_ENABLE_WIFI_CONTROL_FUNC
 	gpio_hostwakeup_alloc_irq(padapter);
 #endif /* RTW_ENABLE_WIFI_CONTROL_FUNC */
 #endif /* CONFIG_PLATFORM_ARM_SUN6I */
