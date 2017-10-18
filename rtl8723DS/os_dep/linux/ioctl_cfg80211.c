@@ -1863,6 +1863,8 @@ void rtw_cfg80211_indicate_scan_done(_adapter *adapter, bool aborted)
 	_irqL	irqL;
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0))
 	struct cfg80211_scan_info info;
+
+	memset(&info, 0, sizeof(info));
 #endif
 	_enter_critical_bh(&pwdev_priv->scan_req_lock, &irqL);
 	if (pwdev_priv->scan_request != NULL) {
@@ -2461,8 +2463,19 @@ static int cfg80211_rtw_scan(struct wiphy *wiphy
 
 check_need_indicate_scan_done:
 	if (_TRUE == need_indicate_scan_done) {
+#if (KERNEL_VERSION(4, 7, 0) <= LINUX_VERSION_CODE)
+		struct cfg80211_scan_info info;
+
+		memset(&info, 0, sizeof(info));
+		info.aborted = 0;
+#endif
 		_rtw_cfg80211_surveydone_event_callback(padapter, request);
+#if (KERNEL_VERSION(4, 7, 0) <= LINUX_VERSION_CODE)
+		cfg80211_scan_done(request, &info);
+#else
 		cfg80211_scan_done(request, 0);
+#endif
+
 	}
 
 cancel_ps_deny:
