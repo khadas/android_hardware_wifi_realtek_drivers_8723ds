@@ -121,16 +121,35 @@ struct vht_priv {
 	u8	ldpc_cap;
 	u8	stbc_cap;
 	u16	beamform_cap;
+	u8	ap_is_mu_bfer;
 
 	u8	sgi_80m;/* short GI */
 	u8	ampdu_len;
 
-	u8	vht_op_mode_notify;
 	u8	vht_highest_rate;
 	u8	vht_mcs_map[2];
 
-	u8	vht_cap[32];
+	u8 op_present:1; /* vht_op is present */
+	u8 notify_present:1; /* vht_op_mode_notify is present */
+
+	u8 vht_cap[32];
+	u8 vht_op[VHT_OP_IE_LEN];
+	u8 vht_op_mode_notify;
 };
+
+#ifdef ROKU_PRIVATE
+struct vht_priv_infra_ap {
+
+	/* Infra mode, only store for AP's info, not intersection of STA and AP*/
+	u8	ldpc_cap_infra_ap;
+	u8	stbc_cap_infra_ap;
+	u16	beamform_cap_infra_ap;
+	u8	vht_mcs_map_infra_ap[2];
+	u8	vht_mcs_map_tx_infra_ap[2];
+	u8	channel_width_infra_ap;
+	u8	number_of_streams_infra_ap;
+};
+#endif /* ROKU_PRIVATE */
 
 u8	rtw_get_vht_highest_rate(u8 *pvht_mcs_map);
 u16	rtw_vht_mcs_to_data_rate(u8 bw, u8 short_GI, u8 vht_mcs_rate);
@@ -142,6 +161,9 @@ u32	rtw_build_vht_cap_ie(_adapter *padapter, u8 *pbuf);
 void	update_sta_vht_info_apmode(_adapter *padapter, PVOID psta);
 void	update_hw_vht_param(_adapter *padapter);
 void	VHT_caps_handler(_adapter *padapter, PNDIS_802_11_VARIABLE_IEs pIE);
+#ifdef ROKU_PRIVATE
+void	VHT_caps_handler_infra_ap(_adapter *padapter, PNDIS_802_11_VARIABLE_IEs pIE);
+#endif /* ROKU_PRIVATE */
 void	VHT_operation_handler(_adapter *padapter, PNDIS_802_11_VARIABLE_IEs pIE);
 void	rtw_process_vht_op_mode_notify(_adapter *padapter, u8 *pframe, PVOID sta);
 u32	rtw_restructure_vht_ie(_adapter *padapter, u8 *in_ie, u8 *out_ie, uint in_len, uint *pout_len);
@@ -150,4 +172,5 @@ u8	rtw_vht_mcsmap_to_nss(u8 *pvht_mcs_map);
 void rtw_vht_nss_to_mcsmap(u8 nss, u8 *target_mcs_map, u8 *cur_mcs_map);
 void rtw_vht_ies_attach(_adapter *padapter, WLAN_BSSID_EX *pcur_network);
 void rtw_vht_ies_detach(_adapter *padapter, WLAN_BSSID_EX *pcur_network);
+void rtw_check_for_vht20(_adapter *adapter, u8 *ies, int ies_len);
 #endif /* _RTW_VHT_H_ */

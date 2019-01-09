@@ -127,6 +127,19 @@ int rtw_get_bit_value_from_ieee_value(u8 val)
 	}
 	return 0;
 }
+uint rtw_get_cckrate_size(u8 *rate, u32 rate_length)
+{
+	int i = 0;
+	while(i < rate_length){
+		RTW_DBG("%s, rate[%d]=%u\n", __FUNCTION__, i, rate[i]);
+		if (((rate[i] & 0x7f) == 2) || ((rate[i] & 0x7f) == 4) ||
+			((rate[i] & 0x7f) == 11)  || ((rate[i] & 0x7f) == 22))
+			i++;
+		else
+			break;
+	}
+	return i;
+}
 
 uint	rtw_is_cckrates_included(u8 *rate)
 {
@@ -224,9 +237,9 @@ inline u8 secondary_ch_offset_to_hal_ch_offset(u8 ch_offset)
 	if (ch_offset == SCN)
 		return HAL_PRIME_CHNL_OFFSET_DONT_CARE;
 	else if (ch_offset == SCA)
-		return HAL_PRIME_CHNL_OFFSET_UPPER;
-	else if (ch_offset == SCB)
 		return HAL_PRIME_CHNL_OFFSET_LOWER;
+	else if (ch_offset == SCB)
+		return HAL_PRIME_CHNL_OFFSET_UPPER;
 
 	return HAL_PRIME_CHNL_OFFSET_DONT_CARE;
 }
@@ -236,9 +249,9 @@ inline u8 hal_ch_offset_to_secondary_ch_offset(u8 ch_offset)
 	if (ch_offset == HAL_PRIME_CHNL_OFFSET_DONT_CARE)
 		return SCN;
 	else if (ch_offset == HAL_PRIME_CHNL_OFFSET_LOWER)
-		return SCB;
-	else if (ch_offset == HAL_PRIME_CHNL_OFFSET_UPPER)
 		return SCA;
+	else if (ch_offset == HAL_PRIME_CHNL_OFFSET_UPPER)
+		return SCB;
 
 	return SCN;
 }
@@ -381,6 +394,52 @@ exit:
 	return ret;
 }
 
+ /* Returns:  remove size OR  _FAIL: not updated*/
+int rtw_remove_ie_g_rate(u8 *ie, uint *ie_len, uint offset, u8 eid)
+{
+	int ret = _FAIL;
+	u8 *tem_target_ie;
+	u8 *target_ie;
+	u32 target_ielen,temp_target_ielen,cck_rate_size,rm_size;
+	u8 *start;
+	uint search_len;
+	u8 *remain_ies;
+	uint remain_len;
+	if (!ie || !ie_len || *ie_len <= offset)
+		goto exit;
+
+	start = ie + offset;
+	search_len = *ie_len - offset;
+
+	while (1) {
+		tem_target_ie=rtw_get_ie(start,eid,&temp_target_ielen,search_len);
+		
+		/*if(tem_target_ie)
+			RTW_INFO("%s, tem_target_ie=%u\n", __FUNCTION__,*tem_target_ie);*/
+		if (tem_target_ie && temp_target_ielen) {
+			cck_rate_size = rtw_get_cckrate_size((tem_target_ie+2), temp_target_ielen);
+			rm_size = temp_target_ielen - cck_rate_size;
+			RTW_DBG("%s,cck_rate_size=%u rm_size=%u\n", __FUNCTION__, cck_rate_size, rm_size);
+			temp_target_ielen=temp_target_ielen + 2;/*org size of  Supposrted Rates(include id + length)*/
+			/*RTW_INFO("%s, temp_target_ielen=%u\n", __FUNCTION__,temp_target_ielen);*/
+			remain_ies = tem_target_ie + temp_target_ielen;
+			remain_len = search_len - (remain_ies - start);
+			target_ielen=cck_rate_size;/*discount g mode rate 6, 9 12,18Mbps,id , length*/
+			*(tem_target_ie+1)=target_ielen;/*set new length to Supposrted Rates*/
+			target_ie=tem_target_ie+target_ielen + 2;/*set target ie to address of rate 6Mbps */
+	
+			_rtw_memmove(target_ie, remain_ies, remain_len);
+			*ie_len = *ie_len - rm_size;
+			ret = rm_size;
+
+			start = target_ie;
+			search_len = remain_len;
+		} else
+			break;
+	}
+exit:
+	return ret;
+}
 void rtw_set_supported_rate(u8 *SupportedRates, uint mode)
 {
 
@@ -496,7 +555,7 @@ int rtw_generate_ie(struct registry_priv *pregistrypriv)
 
 #ifdef CONFIG_80211N_HT
 	/* HT Cap. */
-	if (((pregistrypriv->wireless_mode & WIRELESS_11_5N) || (pregistrypriv->wireless_mode & WIRELESS_11_24N))
+	if (is_supported_ht(pregistrypriv->wireless_mode)
 	    && (pregistrypriv->ht_enable == _TRUE)) {
 		/* todo: */
 	}
@@ -677,7 +736,6 @@ int rtw_parse_wpa_ie(u8 *wpa_ie, int wpa_ie_len, int *group_cipher, int *pairwis
 
 int rtw_rsne_info_parse(const u8 *ie, uint ie_len, struct rsne_info *info)
 {
-	int i;
 	const u8 *pos = ie;
 	u16 cnt;
 
@@ -819,7 +877,7 @@ exit:
 int rtw_get_wapi_ie(u8 *in_ie, uint in_len, u8 *wapi_ie, u16 *wapi_len)
 {
 	int len = 0;
-	u8 authmode, i;
+	u8 authmode;
 	uint	cnt;
 	u8 wapi_oui1[4] = {0x0, 0x14, 0x72, 0x01};
 	u8 wapi_oui2[4] = {0x0, 0x14, 0x72, 0x02};
@@ -862,7 +920,7 @@ int rtw_get_wapi_ie(u8 *in_ie, uint in_len, u8 *wapi_ie, u16 *wapi_len)
 
 int rtw_get_sec_ie(u8 *in_ie, uint in_len, u8 *rsn_ie, u16 *rsn_len, u8 *wpa_ie, u16 *wpa_len)
 {
-	u8 authmode, sec_idx, i;
+	u8 authmode, sec_idx;
 	u8 wpa_oui[4] = {0x0, 0x50, 0xf2, 0x01};
 	uint	cnt;
 
@@ -1311,6 +1369,24 @@ ParseRes rtw_ieee802_11_parse_elems(u8 *start, uint len,
 			elems->rm_en_cap = pos;
 			elems->rm_en_cap_len = elen;
 			break;
+#ifdef CONFIG_RTW_MESH
+		case WLAN_EID_PREQ:
+			elems->preq = pos;
+			elems->preq_len = elen;
+			break;
+		case WLAN_EID_PREP:
+			elems->prep = pos;
+			elems->prep_len = elen;
+			break;
+		case WLAN_EID_PERR:
+			elems->perr = pos;
+			elems->perr_len = elen;
+			break;
+		case WLAN_EID_RANN:
+			elems->rann = pos;
+			elems->rann_len = elen;
+			break;
+#endif
 		default:
 			unknown++;
 			if (!show_errors)
@@ -1525,10 +1601,6 @@ void dump_ht_cap_ie_content(void *sel, const u8 *buf, u32 buf_len)
 
 void dump_ht_cap_ie(void *sel, const u8 *ie, u32 ie_len)
 {
-	const u8 *pos = ie;
-	u16 id;
-	u16 len;
-
 	const u8 *ht_cap_ie;
 	sint ht_cap_ielen;
 
@@ -1562,10 +1634,6 @@ void dump_ht_op_ie_content(void *sel, const u8 *buf, u32 buf_len)
 
 void dump_ht_op_ie(void *sel, const u8 *ie, u32 ie_len)
 {
-	const u8 *pos = ie;
-	u16 id;
-	u16 len;
-
 	const u8 *ht_op_ie;
 	sint ht_op_ielen;
 
@@ -1639,8 +1707,10 @@ void dump_wps_ie(void *sel, const u8 *ie, u32 ie_len)
  * @ch: pointer of ch, used as output
  * @bw: pointer of bw, used as output
  * @offset: pointer of offset, used as output
+ * @ht: check HT IEs
+ * @vht: check VHT IEs, if true imply ht is true
  */
-void rtw_ies_get_chbw(u8 *ies, int ies_len, u8 *ch, u8 *bw, u8 *offset)
+void rtw_ies_get_chbw(u8 *ies, int ies_len, u8 *ch, u8 *bw, u8 *offset, u8 ht, u8 vht)
 {
 	u8 *p;
 	int	ie_len;
@@ -1654,7 +1724,7 @@ void rtw_ies_get_chbw(u8 *ies, int ies_len, u8 *ch, u8 *bw, u8 *offset)
 		*ch = *(p + 2);
 
 #ifdef CONFIG_80211N_HT
-	{
+	if (ht || vht) {
 		u8 *ht_cap_ie, *ht_op_ie;
 		int ht_cap_ielen, ht_op_ielen;
 
@@ -1687,44 +1757,29 @@ void rtw_ies_get_chbw(u8 *ies, int ies_len, u8 *ch, u8 *bw, u8 *offset)
 				}
 			}
 		}
-	}
-#endif /* CONFIG_80211N_HT */
-#ifdef CONFIG_80211AC_VHT
-	{
-		u8 *vht_op_ie;
-		int vht_op_ielen;
 
-		vht_op_ie = rtw_get_ie(ies, EID_VHTOperation, &vht_op_ielen, ies_len);
-		if (vht_op_ie && vht_op_ielen) {
-			/* enable VHT 80 before check enable HT40 or not */
-			if (GET_VHT_OPERATION_ELE_CHL_WIDTH(vht_op_ie + 2)  >=  1) {
-				/* for HT40, enable VHT80 */
-				if (*bw == CHANNEL_WIDTH_40)
+#ifdef CONFIG_80211AC_VHT
+		if (vht) {
+			u8 *vht_op_ie;
+			int vht_op_ielen;
+
+			vht_op_ie = rtw_get_ie(ies, EID_VHTOperation, &vht_op_ielen, ies_len);
+			if (vht_op_ie && vht_op_ielen) {
+				if (GET_VHT_OPERATION_ELE_CHL_WIDTH(vht_op_ie + 2) >= 1)
 					*bw = CHANNEL_WIDTH_80;
-				/* for HT20, enable VHT20 */
-				else if (*bw == CHANNEL_WIDTH_20) {
-					/* modify VHT OP IE */
-					SET_VHT_OPERATION_ELE_CHL_WIDTH(vht_op_ie + 2, 0);
-					/* reset to 0 for VHT20 */
-					SET_VHT_OPERATION_ELE_CHL_CENTER_FREQ1(vht_op_ie + 2, 0);
-					SET_VHT_OPERATION_ELE_CHL_CENTER_FREQ2(vht_op_ie + 2, 0);
-				}
-			} else {
-				/*
-				  VHT OP WIDTH = 0  under HT20/HT40
-				  if REGSTY_BW_5G(pregistrypriv) < CHANNEL_WIDTH_80 in rtw_build_vht_operation_ie
-				*/
 			}
 		}
+#endif /* CONFIG_80211AC_VHT */
+
 	}
-#endif
+#endif /* CONFIG_80211N_HT */
 }
 
-void rtw_bss_get_chbw(WLAN_BSSID_EX *bss, u8 *ch, u8 *bw, u8 *offset)
+void rtw_bss_get_chbw(WLAN_BSSID_EX *bss, u8 *ch, u8 *bw, u8 *offset, u8 ht, u8 vht)
 {
 	rtw_ies_get_chbw(bss->IEs + sizeof(NDIS_802_11_FIXED_IEs)
 		, bss->IELength - sizeof(NDIS_802_11_FIXED_IEs)
-		, ch, bw, offset);
+		, ch, bw, offset, ht, vht);
 
 	if (*ch == 0)
 		*ch = bss->Configuration.DSConfig;
@@ -1791,7 +1846,7 @@ void rtw_sync_chbw(u8 *req_ch, u8 *req_bw, u8 *req_offset
 		if (*g_bw == CHANNEL_WIDTH_40 || *g_bw == CHANNEL_WIDTH_80)
 			*req_offset = *g_offset;
 		else if (*g_bw == CHANNEL_WIDTH_20)
-			*req_offset = rtw_get_offset_by_ch(*req_ch);
+			rtw_get_offset_by_chbw(*req_ch, *req_bw, req_offset);
 
 		if (*req_offset == HAL_PRIME_CHNL_OFFSET_DONT_CARE) {
 			RTW_ERR("%s req 80MHz BW without offset, down to 20MHz\n", __func__);
@@ -1803,7 +1858,7 @@ void rtw_sync_chbw(u8 *req_ch, u8 *req_bw, u8 *req_offset
 		if (*g_bw == CHANNEL_WIDTH_40 || *g_bw == CHANNEL_WIDTH_80)
 			*req_offset = *g_offset;
 		else if (*g_bw == CHANNEL_WIDTH_20)
-			*req_offset = rtw_get_offset_by_ch(*req_ch);
+			rtw_get_offset_by_chbw(*req_ch, *req_bw, req_offset);
 
 		if (*req_offset == HAL_PRIME_CHNL_OFFSET_DONT_CARE) {
 			RTW_ERR("%s req 40MHz BW without offset, down to 20MHz\n", __func__);
@@ -1836,7 +1891,7 @@ u32 rtw_get_p2p_merged_ies_len(u8 *in_ie, u32 in_len)
 	PNDIS_802_11_VARIABLE_IEs	pIE;
 	u8 OUI[4] = { 0x50, 0x6f, 0x9a, 0x09 };
 	int i = 0;
-	int j = 0, len = 0;
+	int len = 0;
 
 	while (i < in_len) {
 		pIE = (PNDIS_802_11_VARIABLE_IEs)(in_ie + i);

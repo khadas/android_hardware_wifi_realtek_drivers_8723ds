@@ -271,6 +271,7 @@ enum {
 	MP_STOP,
 	MP_RATE,
 	MP_CHANNEL,
+	MP_CHL_OFFSET,
 	MP_BANDWIDTH,
 	MP_TXPOWER,
 	MP_ANT_TX,
@@ -351,6 +352,7 @@ struct mp_priv {
 	u32 rx_pktloss;
 	BOOLEAN  rx_bindicatePkt;
 	struct recv_stat rxstat;
+	BOOLEAN brx_filter_beacon;
 
 	/* RF/BB relative */
 	u8 channel;
@@ -421,6 +423,7 @@ struct mp_priv {
 
 
 	u8		*TXradomBuffer;
+	u8		CureFuseBTCoex;
 };
 
 typedef struct _IOCMD_STRUCT_ {
@@ -822,6 +825,9 @@ int rtw_mp_rate(struct net_device *dev,
 int rtw_mp_channel(struct net_device *dev,
 		struct iw_request_info *info,
 		struct iw_point *wrqu, char *extra);
+int rtw_mp_ch_offset(struct net_device *dev,
+		struct iw_request_info *info,
+		struct iw_point *wrqu, char *extra);
 int rtw_mp_bandwidth(struct net_device *dev,
 		struct iw_request_info *info,
 		struct iw_point *wrqu, char *extra);
@@ -926,7 +932,7 @@ u8 HwRateToMPTRate(u8 rate);
 int rtw_mp_iqk(struct net_device *dev,
 		 struct iw_request_info *info,
 		 struct iw_point *wrqu, char *extra);
-int rtw_mp_lck(struct net_device *dev, 
-		struct iw_request_info *info, 
+int rtw_mp_lck(struct net_device *dev,
+		struct iw_request_info *info,
 		struct iw_point *wrqu, char *extra);
 #endif /* _RTW_MP_H_ */

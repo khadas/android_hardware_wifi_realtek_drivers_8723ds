@@ -26,9 +26,6 @@
 		#include <linux/gpio.h>
 		#include <custom_gpio.h>
 	#endif /* CONFIG_PLATFORM_SPRD */
-	#ifdef CONFIG_PM
-		#include <linux/pm_runtime.h>
-	#endif
 #endif
 
 #ifdef PLATFORM_OS_XP
