@@ -89,6 +89,7 @@ enum rf_type {
 };
 
 enum bb_path {
+	BB_PATH_NON = 0,
 	BB_PATH_A = 0x00000001,
 	BB_PATH_B = 0x00000002,
 	BB_PATH_C = 0x00000004,
@@ -107,6 +108,7 @@ enum bb_path {
 	BB_PATH_BCD = (BB_PATH_B | BB_PATH_C | BB_PATH_D),
 
 	BB_PATH_ABCD = (BB_PATH_A | BB_PATH_B | BB_PATH_C | BB_PATH_D),
+	BB_PATH_AUTO = 0xff /*for path diversity*/
 };
 
 enum rf_path {
@@ -130,6 +132,11 @@ enum rf_path {
 enum rf_syn {
 	RF_SYN0 = 0,
 	RF_SYN1 = 1,
+};
+
+enum rfc_mode {
+	rfc_4x4 = 0,
+	rfc_2x2 = 1,
 };
 
 enum wireless_set {
@@ -189,7 +196,7 @@ struct dtp_info {
 };
 
 struct cmn_sta_info {
-	u16	dm_ctrl;			/*[Driver]*/			
+	u16	dm_ctrl;			/*[Driver]*/
 	enum channel_width	bw_mode;	/*[Driver] max support BW*/
 	u8	mac_id;				/*[Driver]*/
 	u8	mac_addr[6];			/*[Driver]*/

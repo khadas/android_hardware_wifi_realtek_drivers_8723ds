@@ -235,6 +235,7 @@ struct coex_sta_8723d_1ant {
 	boolean		is_hipri_rx_overhead;
 	s8		bt_rssi;
 	boolean		bt_tx_rx_mask;
+	boolean		bt_mesh_on;
 	u8		pre_bt_rssi_state;
 	u8		pre_wifi_rssi_state[4];
 	u8		bt_info_c2h[BT_INFO_SRC_8723D_1ANT_MAX][10];
@@ -317,6 +318,7 @@ struct coex_sta_8723d_1ant {
 	boolean		is_hid_low_pri_tx_overhead;
 	boolean		is_bt_multi_link;
 	boolean		is_bt_a2dp_sink;
+	boolean		is_bt_mesh_ver;
 
 	u8		wl_fw_dbg_info[10];
 	u8		wl_rx_rate;

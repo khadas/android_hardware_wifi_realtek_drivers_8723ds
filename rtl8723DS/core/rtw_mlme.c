@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2017 Realtek Corporation.
+ * Copyright(c) 2007 - 2019 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -1482,9 +1482,8 @@ u8 _rtw_sitesurvey_condition_check(const char *caller, _adapter *adapter, bool c
 {
 	u8 ss_condition = SS_ALLOW;
 	struct mlme_priv *pmlmepriv = &adapter->mlmepriv;
-#ifdef DBG_LA_MODE
 	struct registry_priv *registry_par = &adapter->registrypriv;
-#endif
+
 
 #ifdef CONFIG_MP_INCLUDED
 	if (rtw_mp_mode_check(adapter)) {
@@ -1526,6 +1525,16 @@ u8 _rtw_sitesurvey_condition_check(const char *caller, _adapter *adapter, bool c
 	if (rtw_is_scan_deny(adapter)) {
 		RTW_INFO("%s ("ADPT_FMT") : scan deny\n", caller, ADPT_ARG(adapter));
 		ss_condition = SS_DENY_BY_DRV;
+		goto _exit;
+	}
+
+	if (registry_par->adaptivity_en
+	    && rtw_phydm_get_edcca_flag(adapter)
+	    && rtw_is_2g_ch(GET_HAL_DATA(adapter)->current_channel)) {
+		RTW_WARN(FUNC_ADPT_FMT": Adaptivity block scan! (ch=%u)\n",
+			 FUNC_ADPT_ARG(adapter),
+			 GET_HAL_DATA(adapter)->current_channel);
+		ss_condition = SS_DENY_ADAPTIVITY;
 		goto _exit;
 	}
 
@@ -1842,7 +1851,7 @@ void rtw_indicate_disconnect(_adapter *padapter, u16 reason, u8 locally_generate
 #endif /* CONFIG_P2P_PS */
 
 #ifdef CONFIG_LPS
-	rtw_lps_ctrl_wk_cmd(padapter, LPS_CTRL_DISCONNECT, 1);
+	rtw_lps_ctrl_wk_cmd(padapter, LPS_CTRL_DISCONNECT, 0);
 #endif
 
 #ifdef CONFIG_BEAMFORMING
@@ -2074,9 +2083,14 @@ static struct sta_info *rtw_joinbss_update_stainfo(_adapter *padapter, struct wl
 			preorder_ctrl = &psta->recvreorder_ctrl[i];
 			preorder_ctrl->enable = _FALSE;
 			preorder_ctrl->indicate_seq = 0xffff;
+			rtw_clear_bit(RTW_RECV_ACK_OR_TIMEOUT, &preorder_ctrl->rec_abba_rsp_ack);
 			#ifdef DBG_RX_SEQ
-			RTW_INFO("DBG_RX_SEQ "FUNC_ADPT_FMT" tid:%u SN_CLEAR indicate_seq:%u\n"
-				, FUNC_ADPT_ARG(padapter), i, preorder_ctrl->indicate_seq);
+			RTW_INFO("DBG_RX_SEQ "FUNC_ADPT_FMT" tid:%u SN_CLEAR indicate_seq:%u preorder_ctrl->rec_abba_rsp_ack:%lu\n"
+				, FUNC_ADPT_ARG(padapter)
+				, i
+				, preorder_ctrl->indicate_seq
+				,preorder_ctrl->rec_abba_rsp_ack
+				);
 			#endif
 			preorder_ctrl->wend_b = 0xffff;
 			preorder_ctrl->wsize_b = 64;/* max_ampdu_sz; */ /* ex. 32(kbytes) -> wsize_b=32 */
@@ -2278,6 +2292,10 @@ void rtw_joinbss_event_prehandle(_adapter *adapter, u8 *pbuf, u16 status)
 					_exit_critical_bh(&(pmlmepriv->scanned_queue.lock), &irqL);
 					goto ignore_joinbss_callback;
 				}
+
+				/* Queue TX packets before FW/HW ready */
+				/* clear in mlmeext_joinbss_event_callback() */
+				rtw_xmit_queue_set(ptarget_sta);
 			}
 
 			/* s4. indicate connect			 */
@@ -3185,7 +3203,6 @@ void rtw_drv_scan_by_self(_adapter *padapter, u8 reason)
 	struct sitesurvey_parm parm;
 	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
 	int i;
-#if 1
 	u8 ssc_chk;
 
 	ssc_chk = rtw_sitesurvey_condition_check(padapter, _FALSE);
@@ -3203,40 +3220,7 @@ void rtw_drv_scan_by_self(_adapter *padapter, u8 reason)
 
 	if (!rtw_is_adapter_up(padapter))
 		goto exit;
-#else
-	if (rtw_is_scan_deny(padapter))
-		goto exit;
 
-	if (!rtw_is_adapter_up(padapter))
-		goto exit;
-
-	if (rtw_mi_busy_traffic_check(padapter, _FALSE)) {
-#ifdef CONFIG_LAYER2_ROAMING
-		if (rtw_chk_roam_flags(padapter, RTW_ROAM_ACTIVE) && pmlmepriv->need_to_roam == _TRUE) {
-			RTW_INFO("need to roam, don't care BusyTraffic\n");
-		} else
-#endif
-		{
-			RTW_INFO(FUNC_ADPT_FMT" exit BusyTraffic\n", FUNC_ADPT_ARG(padapter));
-			goto exit;
-		}
-	}
-	if (check_fwstate(pmlmepriv, WIFI_AP_STATE) && check_fwstate(pmlmepriv, WIFI_UNDER_WPS)) {
-		RTW_INFO(FUNC_ADPT_FMT" WIFI_AP_STATE && WIFI_UNDER_WPS\n", FUNC_ADPT_ARG(padapter));
-		goto exit;
-	}
-	if (check_fwstate(pmlmepriv, (_FW_UNDER_SURVEY | _FW_UNDER_LINKING)) == _TRUE) {
-		RTW_INFO(FUNC_ADPT_FMT" _FW_UNDER_SURVEY|_FW_UNDER_LINKING\n", FUNC_ADPT_ARG(padapter));
-		goto exit;
-	}
-
-#ifdef CONFIG_CONCURRENT_MODE
-	if (rtw_mi_buddy_check_fwstate(padapter, (_FW_UNDER_SURVEY | _FW_UNDER_LINKING | WIFI_UNDER_WPS))) {
-		RTW_INFO(FUNC_ADPT_FMT", but buddy_intf is under scanning or linking or wps_phase\n", FUNC_ADPT_ARG(padapter));
-		goto exit;
-	}
-#endif
-#endif
 
 	RTW_INFO(FUNC_ADPT_FMT" reason:0x%02x\n", FUNC_ADPT_ARG(padapter), reason);
 
@@ -3319,10 +3303,10 @@ void rtw_iface_dynamic_check_timer_handlder(_adapter *adapter)
 
 		bEnterPS = traffic_status_watchdog(adapter, 1);
 		if (bEnterPS) {
-			/* rtw_lps_ctrl_wk_cmd(adapter, LPS_CTRL_ENTER, 1); */
+			/* rtw_lps_ctrl_wk_cmd(adapter, LPS_CTRL_ENTER, 0); */
 			rtw_hal_dm_watchdog_in_lps(adapter);
 		} else {
-			/* call rtw_lps_ctrl_wk_cmd(padapter, LPS_CTRL_LEAVE, 1) in traffic_status_watchdog() */
+			/* call rtw_lps_ctrl_wk_cmd(padapter, LPS_CTRL_LEAVE, 0) in traffic_status_watchdog() */
 		}
 	}
 	#endif /* CONFIG_LPS_LCLK_WD_TIMER	*/
@@ -4680,6 +4664,15 @@ unsigned int rtw_restructure_ht_ie(_adapter *padapter, u8 *in_ie, u8 *out_ie, ui
 					}
 				}
 			}
+            // IOT issue : AP TP-Link WDR6500
+            if(oper_bw == CHANNEL_WIDTH_40){
+                p = rtw_get_ie(in_ie, WLAN_EID_HT_CAP, &ielen, in_len);
+                if (p && ielen == HT_CAP_IE_LEN) {
+                    oper_bw = GET_HT_CAP_ELE_CHL_WIDTH(p + 2)  ? CHANNEL_WIDTH_40 : CHANNEL_WIDTH_20;
+                    if(oper_bw == CHANNEL_WIDTH_20)
+                        oper_offset = HAL_PRIME_CHNL_OFFSET_DONT_CARE;
+                }
+            }
 		}
 
 		/* adjust bw to fit in channel plan setting */

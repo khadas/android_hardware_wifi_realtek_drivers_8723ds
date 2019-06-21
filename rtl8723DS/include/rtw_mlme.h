@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2017 Realtek Corporation.
+ * Copyright(c) 2007 - 2019 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -1239,6 +1239,7 @@ enum {
 #ifdef DBG_LA_MODE
 	SS_DENY_LA_MODE,
 #endif
+	SS_DENY_ADAPTIVITY,
 };
 
 u8 _rtw_sitesurvey_condition_check(const char *caller, _adapter *adapter, bool check_sc_interval);

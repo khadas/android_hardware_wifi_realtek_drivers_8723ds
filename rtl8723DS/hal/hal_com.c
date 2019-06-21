@@ -3731,6 +3731,225 @@ static void hw_var_set_bcn_interval(_adapter *adapter, u16 interval)
 #endif
 }
 
+#if CONFIG_TX_AC_LIFETIME
+const char *const _tx_aclt_conf_str[] = {
+	"DEFAULT",
+	"AP_M2U",
+	"MESH",
+	"INVALID",
+};
+
+void dump_tx_aclt_force_val(void *sel, struct dvobj_priv *dvobj)
+{
+#define TX_ACLT_FORCE_MSG_LEN 64
+	struct hal_spec_t *hal_spec = GET_HAL_SPEC(dvobj_get_primary_adapter(dvobj));
+	struct tx_aclt_conf_t *conf = &dvobj->tx_aclt_force_val;
+	char buf[TX_ACLT_FORCE_MSG_LEN];
+	int cnt = 0;
+
+	RTW_PRINT_SEL(sel, "unit:%uus, maximum:%uus\n"
+		, hal_spec->tx_aclt_unit_factor * 32
+		, 0xFFFF * hal_spec->tx_aclt_unit_factor * 32);
+
+	RTW_PRINT_SEL(sel, "%-5s %-12s %-12s\n", "en", "vo_vi(us)", "be_bk(us)");
+	RTW_PRINT_SEL(sel, " 0x%02x %12u %12u\n"
+		, conf->en
+		, conf->vo_vi * hal_spec->tx_aclt_unit_factor * 32
+		, conf->be_bk * hal_spec->tx_aclt_unit_factor * 32
+	);
+
+	cnt += snprintf(buf + cnt, TX_ACLT_FORCE_MSG_LEN - cnt - 1, "%5s", conf->en == 0xFF ? "AUTO" : "FORCE");
+	if (cnt >= TX_ACLT_FORCE_MSG_LEN - 1)
+		goto exit;
+
+	if (conf->vo_vi)
+		cnt += snprintf(buf + cnt, TX_ACLT_FORCE_MSG_LEN - cnt - 1, " FORCE:0x%04x", conf->vo_vi);
+	else
+		cnt += snprintf(buf + cnt, TX_ACLT_FORCE_MSG_LEN - cnt - 1, "         AUTO");
+	if (cnt >= TX_ACLT_FORCE_MSG_LEN - 1)
+		goto exit;
+
+
+	if (conf->be_bk)
+		cnt += snprintf(buf + cnt, TX_ACLT_FORCE_MSG_LEN - cnt - 1, " FORCE:0x%04x", conf->be_bk);
+	else
+		cnt += snprintf(buf + cnt, TX_ACLT_FORCE_MSG_LEN - cnt - 1, "         AUTO");
+	if (cnt >= TX_ACLT_FORCE_MSG_LEN - 1)
+		goto exit;
+
+	RTW_PRINT_SEL(sel, "%s\n", buf);
+
+exit:
+	return;
+}
+
+void rtw_hal_set_tx_aclt_force_val(_adapter *adapter, struct tx_aclt_conf_t *input, u8 arg_num)
+{
+	struct hal_spec_t *hal_spec = GET_HAL_SPEC(adapter);
+	struct dvobj_priv *dvobj = adapter_to_dvobj(adapter);
+	struct tx_aclt_conf_t *conf = &dvobj->tx_aclt_force_val;
+
+	if (arg_num >= 1) {
+		if (input->en == 0xFF)
+			conf->en = input->en;
+		else
+			conf->en = input->en & 0xF;
+	}
+	if (arg_num >= 2) {
+		conf->vo_vi = input->vo_vi / (hal_spec->tx_aclt_unit_factor * 32);
+		if (conf->vo_vi > 0xFFFF)
+			conf->vo_vi = 0xFFFF;
+	}
+	if (arg_num >= 3) {
+		conf->be_bk = input->be_bk / (hal_spec->tx_aclt_unit_factor * 32);
+		if (conf->be_bk > 0xFFFF)
+			conf->be_bk = 0xFFFF;
+	}
+}
+
+void dump_tx_aclt_confs(void *sel, struct dvobj_priv *dvobj)
+{
+#define TX_ACLT_CONF_MSG_LEN 32
+	struct hal_spec_t *hal_spec = GET_HAL_SPEC(dvobj_get_primary_adapter(dvobj));
+	struct tx_aclt_conf_t *conf;
+	char buf[TX_ACLT_CONF_MSG_LEN];
+	int cnt;
+	int i;
+
+	RTW_PRINT_SEL(sel, "unit:%uus, maximum:%uus\n"
+		, hal_spec->tx_aclt_unit_factor * 32
+		, 0xFFFF * hal_spec->tx_aclt_unit_factor * 32);
+
+	RTW_PRINT_SEL(sel, "%-7s %-1s %-3s %-9s %-9s %-10s %-10s\n"
+		, "name", "#", "en", "vo_vi(us)", "be_bk(us)", "vo_vi(reg)", "be_bk(reg)");
+
+	for (i = 0; i < TX_ACLT_CONF_NUM; i++) {
+		conf = &dvobj->tx_aclt_confs[i];
+		cnt = 0;
+
+		if (conf->vo_vi)
+			cnt += snprintf(buf + cnt, TX_ACLT_CONF_MSG_LEN - cnt - 1, "     0x%04x", conf->vo_vi);
+		else
+			cnt += snprintf(buf + cnt, TX_ACLT_CONF_MSG_LEN - cnt - 1, "        N/A");
+		if (cnt >= TX_ACLT_CONF_MSG_LEN - 1)
+			continue;
+		
+		if (conf->be_bk)
+			cnt += snprintf(buf + cnt, TX_ACLT_CONF_MSG_LEN - cnt - 1, "     0x%04x", conf->be_bk);
+		else
+			cnt += snprintf(buf + cnt, TX_ACLT_CONF_MSG_LEN - cnt - 1, "        N/A");
+		if (cnt >= TX_ACLT_CONF_MSG_LEN - 1)
+			continue;
+
+		RTW_PRINT_SEL(sel, "%7s %1u 0x%x %9u %9u%s\n"
+			, tx_aclt_conf_str(i), i
+			, conf->en
+			, conf->vo_vi * hal_spec->tx_aclt_unit_factor * 32
+			, conf->be_bk * hal_spec->tx_aclt_unit_factor * 32
+			, buf
+		);
+	}
+}
+
+void rtw_hal_set_tx_aclt_conf(_adapter *adapter, u8 conf_idx, struct tx_aclt_conf_t *input, u8 arg_num)
+{
+	struct hal_spec_t *hal_spec = GET_HAL_SPEC(adapter);
+	struct dvobj_priv *dvobj = adapter_to_dvobj(adapter);
+	struct tx_aclt_conf_t *conf;
+
+	if (conf_idx >= TX_ACLT_CONF_NUM)
+		return;
+
+	conf = &dvobj->tx_aclt_confs[conf_idx];
+
+	if (arg_num >= 1) {
+		if (input->en != 0xFF)
+			conf->en = input->en & 0xF;
+	}
+	if (arg_num >= 2) {
+		conf->vo_vi = input->vo_vi / (hal_spec->tx_aclt_unit_factor * 32);
+		if (conf->vo_vi > 0xFFFF)
+			conf->vo_vi = 0xFFFF;
+	}
+	if (arg_num >= 3) {
+		conf->be_bk = input->be_bk / (hal_spec->tx_aclt_unit_factor * 32);
+		if (conf->be_bk > 0xFFFF)
+			conf->be_bk = 0xFFFF;
+	}
+}
+
+void rtw_hal_update_tx_aclt(_adapter *adapter)
+{
+#ifdef CONFIG_TX_MCAST2UNI
+	extern int rtw_mc2u_disable;
+#endif
+	struct dvobj_priv *dvobj = adapter_to_dvobj(adapter);
+	struct macid_ctl_t *macid_ctl = adapter_to_macidctl(adapter);
+	u8 lt_en = 0, lt_en_ori;
+	u16 lt_vo_vi = 0xFFFF, lt_be_bk = 0xFFFF;
+	u32 lt, lt_ori;
+	struct tx_aclt_conf_t *conf;
+	int i;
+
+	lt_en_ori = rtw_read8(adapter, REG_LIFETIME_EN);
+	lt_ori = rtw_read32(adapter, REG_PKT_LIFE_TIME);
+
+	for (i = 0; i < TX_ACLT_CONF_NUM; i++) {
+		if (!(dvobj->tx_aclt_flags & BIT(i)))
+			continue;
+
+		conf = &dvobj->tx_aclt_confs[i];
+
+		if (i == TX_ACLT_CONF_DEFAULT) {
+			/* first and default status, assign directly */
+			lt_en = conf->en;
+			if (conf->vo_vi)
+				lt_vo_vi = conf->vo_vi;
+			if (conf->be_bk)
+				lt_be_bk = conf->be_bk;
+		}
+		#if defined(CONFIG_TX_MCAST2UNI) || defined(CONFIG_RTW_MESH)
+		else if (0
+			#ifdef CONFIG_TX_MCAST2UNI
+			|| (i == TX_ACLT_CONF_AP_M2U
+				&& !rtw_mc2u_disable
+				&& macid_ctl->op_num[H2C_MSR_ROLE_STA] /* having AP mode with STA connected */)
+			#endif
+			#ifdef CONFIG_RTW_MESH
+			|| (i == TX_ACLT_CONF_MESH
+				&& macid_ctl->op_num[H2C_MSR_ROLE_MESH] > 1 /* implies only 1 MESH mode supported */)
+			#endif
+		) {
+			/* long term status, OR en and MIN lifetime */
+			lt_en |= conf->en;
+			if (conf->vo_vi && lt_vo_vi > conf->vo_vi)
+				lt_vo_vi = conf->vo_vi;
+			if (conf->be_bk && lt_be_bk > conf->be_bk)
+				lt_be_bk = conf->be_bk;
+		}
+		#endif
+	}
+
+	if (dvobj->tx_aclt_force_val.en != 0xFF)
+		lt_en = dvobj->tx_aclt_force_val.en;
+	if (dvobj->tx_aclt_force_val.vo_vi)
+		lt_vo_vi = dvobj->tx_aclt_force_val.vo_vi;
+	if (dvobj->tx_aclt_force_val.be_bk)
+		lt_be_bk = dvobj->tx_aclt_force_val.be_bk;
+
+	lt_en = (lt_en_ori & 0xF0) | (lt_en & 0x0F);
+	lt = (lt_be_bk << 16) | lt_vo_vi;
+
+	if (0)
+		RTW_INFO("lt_en:0x%x(0x%x), lt:0x%08x(0x%08x)\n", lt_en, lt_en_ori, lt, lt_ori);
+
+	if (lt_en != lt_en_ori)
+		rtw_write8(adapter, REG_LIFETIME_EN, lt_en);
+	if (lt != lt_ori)
+		rtw_write32(adapter, REG_PKT_LIFE_TIME, lt);
+}
+#endif /* CONFIG_TX_AC_LIFETIME */
+
 void hw_var_port_switch(_adapter *adapter)
 {
 #ifdef CONFIG_CONCURRENT_MODE
@@ -4313,6 +4532,7 @@ s32 rtw_hal_set_FwMediaStatusRpt_cmd(_adapter *adapter, bool opmode, bool miraca
 #ifdef CONFIG_FW_MULTI_PORT_SUPPORT
 	u8 hw_port = rtw_hal_get_port(adapter);
 #endif
+	u8 op_num_change_bmp = 0;
 
 	SET_H2CCMD_MSRRPT_PARM_OPMODE(parm, opmode);
 	SET_H2CCMD_MSRRPT_PARM_MACID_IND(parm, macid_ind);
@@ -4367,7 +4587,7 @@ s32 rtw_hal_set_FwMediaStatusRpt_cmd(_adapter *adapter, bool opmode, bool miraca
 		macid_end = macid;
 
 	for (i = macid; macid <= macid_end; macid++) {
-		rtw_macid_ctl_set_h2c_msr(macid_ctl, macid, parm[0]);
+		op_num_change_bmp |= rtw_macid_ctl_set_h2c_msr(macid_ctl, macid, parm[0]);
 		if (!opmode) {
 			rtw_macid_ctl_set_bw(macid_ctl, macid, CHANNEL_WIDTH_20);
 			rtw_macid_ctl_set_vht_en(macid_ctl, macid, 0);
@@ -4375,6 +4595,12 @@ s32 rtw_hal_set_FwMediaStatusRpt_cmd(_adapter *adapter, bool opmode, bool miraca
 			rtw_macid_ctl_set_rate_bmp1(macid_ctl, macid, 0);
 		}
 	}
+
+#if CONFIG_TX_AC_LIFETIME
+	if (op_num_change_bmp)
+		rtw_hal_update_tx_aclt(adapter);
+#endif
+
 	if (!opmode)
 		rtw_update_tx_rate_bmp(adapter_to_dvobj(adapter));
 
@@ -4422,8 +4648,7 @@ void rtw_hal_switch_gpio_wl_ctrl(_adapter *padapter, u8 index, u8 enable)
 	PHAL_DATA_TYPE pHalData = GET_HAL_DATA(padapter);
 
 	if (IS_8723D_SERIES(pHalData->version_id) || IS_8192F_SERIES(pHalData->version_id)
-		|| IS_8822B_SERIES(pHalData->version_id) || IS_8821C_SERIES(pHalData->version_id)
-		|| IS_8822C_SERIES(pHalData->version_id))
+		|| IS_8822B_SERIES(pHalData->version_id) || IS_8821C_SERIES(pHalData->version_id))
 			rtw_hal_set_hwreg(padapter, HW_SET_GPIO_WL_CTRL, (u8 *)(&enable));
 	/*
 	* Switch GPIO_13, GPIO_14 to wlan control, or pull GPIO_13,14 MUST fail.
@@ -10872,8 +11097,11 @@ static void hw_var_set_mlme_sitesurvey(_adapter *adapter, u8 enable)
 
 		rtw_hal_rcr_set_chk_bssid(adapter, MLME_SCAN_ENTER);
 
-		/* Save orignal RRSR setting. needed? */
-		hal_data->RegRRSR = rtw_read16(adapter, REG_RRSR);
+		/* Save orignal RRSR setting, only 8812 set RRSR after set ch/bw/band */
+		#if defined (CONFIG_RTL8812A) || defined(CONFIG_RTL8821A)
+		hal_data->RegRRSR = rtw_read32(adapter, REG_RRSR);
+		hal_data->RegRRSR &= 0x000FFFFF;
+		#endif
 
 		#if defined(CONFIG_BEAMFORMING) && (defined(CONFIG_RTL8812A) || defined(CONFIG_RTL8821A))
 		if (IS_8812_SERIES(hal_data->version_id) || IS_8821_SERIES(hal_data->version_id)) {
@@ -10899,8 +11127,18 @@ static void hw_var_set_mlme_sitesurvey(_adapter *adapter, u8 enable)
 
 		rtw_hal_rcr_set_chk_bssid(adapter, MLME_SCAN_DONE);
 
-		/* Restore orignal RRSR setting. needed? */
-		rtw_write16(adapter, REG_RRSR, hal_data->RegRRSR);
+		/* Restore orignal RRSR setting,only 8812 set RRSR after set ch/bw/band */
+		#if defined (CONFIG_RTL8812A) || defined(CONFIG_RTL8821A)
+		#ifdef RTW_DYNAMIC_RRSR
+			rtw_phydm_set_rrsr(adapter, hal_data->RegRRSR, TRUE);
+		#else/*RTW_DYNAMIC_RRSR*/
+			u32 temp_RRSR;
+			temp_RRSR = rtw_read32(adapter, REG_RRSR);
+			temp_RRSR &= 0xFFF00000;
+			hal_data->RegRRSR |= temp_RRSR;
+			rtw_write32(adapter, REG_RRSR, hal_data->RegRRSR);
+		#endif/*RTW_DYNAMIC_RRSR*/
+		#endif
 
 		#if defined(CONFIG_BEAMFORMING) && (defined(CONFIG_RTL8812A) || defined(CONFIG_RTL8821A))
 		if (IS_8812_SERIES(hal_data->version_id) || IS_8821_SERIES(hal_data->version_id)) {
@@ -11523,6 +11761,76 @@ void rtw_lps_state_chk(_adapter *adapter, u8 ps_mode)
 		}
 	}
 }
+void rtw_var_set_basic_rate(PADAPTER padapter, u8 *val) {
+
+	PHAL_DATA_TYPE	pHalData = GET_HAL_DATA(padapter);
+	struct mlme_ext_info *mlmext_info = &padapter->mlmeextpriv.mlmext_info;
+	u16 input_b = 0, masked = 0, ioted = 0, BrateCfg = 0;
+	u16 rrsr_2g_force_mask = RRSR_CCK_RATES;
+	u16 rrsr_2g_allow_mask = (RRSR_24M | RRSR_12M | RRSR_6M | RRSR_CCK_RATES);
+	#ifdef CONFIG_IEEE80211_BAND_5GHZ
+	u16 rrsr_5g_force_mask = (RRSR_6M);
+	u16 rrsr_5g_allow_mask = (RRSR_OFDM_RATES);
+	#endif
+	#ifdef RTW_DYNAMIC_RRSR
+	u32 temp_RRSR;
+	#endif
+
+	HalSetBrateCfg(padapter, val, &BrateCfg);
+	input_b = BrateCfg;
+
+	/* apply force and allow mask */
+	#ifdef CONFIG_IEEE80211_BAND_5GHZ
+	if (pHalData->current_band_type != BAND_ON_2_4G) {
+		BrateCfg |= rrsr_5g_force_mask;
+		BrateCfg &= rrsr_5g_allow_mask;
+	} else
+	#endif
+	{ /* 2.4G */
+		BrateCfg |= rrsr_2g_force_mask;
+		BrateCfg &= rrsr_2g_allow_mask;
+	}
+	masked = BrateCfg;
+
+#ifdef CONFIG_CMCC_TEST
+	BrateCfg |= (RRSR_11M | RRSR_5_5M | RRSR_1M); /* use 11M to send ACK */
+	BrateCfg |= (RRSR_24M | RRSR_18M | RRSR_12M); /*CMCC_OFDM_ACK 12/18/24M */
+#endif
+
+	/* IOT consideration */
+	if (mlmext_info->assoc_AP_vendor == HT_IOT_PEER_CISCO) {
+		/* if peer is cisco and didn't use ofdm rate, we enable 6M ack */
+		if ((BrateCfg & (RRSR_24M | RRSR_12M | RRSR_6M)) == 0)
+			BrateCfg |= RRSR_6M;
+	}
+		ioted = BrateCfg;
+
+#ifdef CONFIG_NARROWBAND_SUPPORTING
+	if ((padapter->registrypriv.rtw_nb_config == RTW_NB_CONFIG_WIDTH_10)
+		|| (padapter->registrypriv.rtw_nb_config == RTW_NB_CONFIG_WIDTH_5)) {
+		BrateCfg &= ~RRSR_CCK_RATES;
+		BrateCfg |= RRSR_6M;
+	}
+#endif
+	pHalData->BasicRateSet = BrateCfg;
+
+	RTW_INFO("HW_VAR_BASIC_RATE: %#x->%#x->%#x\n", input_b, masked, ioted);
+
+	/* Set RRSR rate table. */
+	#ifdef RTW_DYNAMIC_RRSR
+		temp_RRSR = rtw_read32(padapter, REG_RRSR);
+		temp_RRSR &=0xFFFF0000;
+		temp_RRSR |=BrateCfg;
+		rtw_phydm_set_rrsr(padapter, temp_RRSR, TRUE);
+	#else
+		rtw_write16(padapter, REG_RRSR, BrateCfg);
+	#endif
+	rtw_write8(padapter, REG_RRSR + 2, rtw_read8(padapter, REG_RRSR + 2) & 0xf0);
+
+	#if defined(CONFIG_RTL8188E)
+	rtw_hal_set_hwreg(padapter, HW_VAR_INIT_RTS_RATE, (u8 *)&BrateCfg);
+	#endif
+}
 
 u8 SetHwReg(_adapter *adapter, u8 variable, u8 *val)
 {
@@ -12025,6 +12333,8 @@ void rtw_hal_beamforming_config_csirate(PADAPTER adapter)
 	struct beamforming_info *bf_info;
 	u8 fix_rate_enable = 0;
 	u8 new_csi_rate_idx;
+	u8 rrsr_54_en;
+	u32 temp_rrsr;
 
 	/* Acting as BFee */
 	if (IS_BEAMFORMEE(adapter)) {
@@ -12040,7 +12350,18 @@ void rtw_hal_beamforming_config_csirate(PADAPTER adapter)
 		rtw_halmac_bf_cfg_csi_rate(adapter_to_dvobj(adapter),
 				p_dm_odm->rssi_min,
 				bf_info->cur_csi_rpt_rate,
-				fix_rate_enable, &new_csi_rate_idx);
+				fix_rate_enable, &new_csi_rate_idx, &rrsr_54_en);
+
+		temp_rrsr = rtw_read32(adapter,REG_RRSR);
+		if(rrsr_54_en == 1) 
+			temp_rrsr |= BIT(HALMAC_OFDM54);
+		 else if(rrsr_54_en == 0) 
+			temp_rrsr &= ~(BIT(HALMAC_OFDM54));
+	#ifdef RTW_DYNAMIC_RRSR
+		rtw_phydm_set_rrsr(adapter, temp_rrsr, FALSE);
+	#else
+		rtw_write32(adapter, REG_RRSR, temp_rrsr);
+	#endif
 
 		if (new_csi_rate_idx != bf_info->cur_csi_rpt_rate)
 			bf_info->cur_csi_rpt_rate = new_csi_rate_idx;
@@ -14042,6 +14363,11 @@ void dump_hal_spec(void *sel, _adapter *adapter)
 			_RTW_PRINT_SEL(sel, "%s ", _wl_func_str[i]);
 	}
 	_RTW_PRINT_SEL(sel, "\n");
+
+#if CONFIG_TX_AC_LIFETIME
+	RTW_PRINT_SEL(sel, "tx_aclt_unit_factor:%u (unit:%uus)\n"
+		, hal_spec->tx_aclt_unit_factor, hal_spec->tx_aclt_unit_factor * 32);
+#endif
 
 	RTW_PRINT_SEL(sel, "rx_tsf_filter:%u\n", hal_spec->rx_tsf_filter);
 

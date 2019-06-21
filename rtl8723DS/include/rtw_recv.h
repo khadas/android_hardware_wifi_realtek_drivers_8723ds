@@ -89,6 +89,10 @@
 extern u8 rtw_bridge_tunnel_header[];
 extern u8 rtw_rfc1042_header[];
 
+enum addba_rsp_ack_state {
+	RTW_RECV_ACK_OR_TIMEOUT,
+};
+
 /* for Rx reordering buffer control */
 struct recv_reorder_ctrl {
 	_adapter	*padapter;
@@ -101,6 +105,7 @@ struct recv_reorder_ctrl {
 	_queue pending_recvframe_queue;
 	_timer reordering_ctrl_timer;
 	u8 bReorderWaiting;
+	unsigned long rec_abba_rsp_ack;
 };
 
 struct	stainfo_rxcache	{

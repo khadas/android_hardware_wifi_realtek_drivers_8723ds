@@ -270,6 +270,9 @@ enum rtw_drvextra_cmd_id {
 #ifdef CONFIG_CTRL_TXSS_BY_TP
 	TXSS_WK_CID,
 #endif
+#ifdef CONFIG_AP_MODE
+	STOP_AP_WK_CID,
+#endif
 	MAX_WK_CID
 };
 
@@ -285,6 +288,7 @@ enum LPS_CTRL_TYPE {
 	LPS_CTRL_RX_TRAFFIC_LEAVE = 8,
 	LPS_CTRL_ENTER = 9,
 	LPS_CTRL_LEAVE_CFG80211_PWRMGMT = 10,
+	LPS_CTRL_LEAVE_SET_LEVEL = 11,
 };
 
 enum STAKEY_TYPE {
@@ -1037,6 +1041,9 @@ extern u8 rtw_clearstakey_cmd(_adapter *padapter, struct sta_info *sta, u8 enque
 
 extern u8 rtw_joinbss_cmd(_adapter  *padapter, struct wlan_network *pnetwork);
 u8 rtw_disassoc_cmd(_adapter *padapter, u32 deauth_timeout_ms, int flags);
+#ifdef CONFIG_AP_MODE
+u8 rtw_stop_ap_cmd(_adapter *adapter, u8 flags);
+#endif
 extern u8 rtw_setopmode_cmd(_adapter  *padapter, NDIS_802_11_NETWORK_INFRASTRUCTURE networktype, u8 flags);
 extern u8 rtw_setdatarate_cmd(_adapter  *padapter, u8 *rateset);
 extern u8 rtw_setbasicrate_cmd(_adapter  *padapter, u8 *rateset);
@@ -1061,7 +1068,8 @@ extern u8 rtw_reset_securitypriv_cmd(_adapter *padapter);
 extern u8 rtw_free_assoc_resources_cmd(_adapter *padapter, u8 lock_scanned_queue, int flags);
 extern u8 rtw_dynamic_chk_wk_cmd(_adapter *adapter);
 
-u8 rtw_lps_ctrl_wk_cmd(_adapter *padapter, u8 lps_ctrl_type, u8 enqueue);
+u8 rtw_lps_ctrl_wk_cmd(_adapter *padapter, u8 lps_ctrl_type, u8 flags);
+u8 rtw_lps_ctrl_leave_set_level_cmd(_adapter *adapter, u8 lps_level, u8 flags);
 u8 rtw_dm_in_lps_wk_cmd(_adapter *padapter);
 u8 rtw_lps_change_dtim_cmd(_adapter *padapter, u8 dtim);
 

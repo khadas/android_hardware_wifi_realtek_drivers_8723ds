@@ -232,6 +232,11 @@ struct registry_priv {
 
 	WLAN_BSSID_EX    dev_network;
 
+#if CONFIG_TX_AC_LIFETIME
+	u8 tx_aclt_flags;
+	struct tx_aclt_conf_t tx_aclt_confs[TX_ACLT_CONF_NUM];
+#endif
+
 	u8 tx_bw_mode;
 #ifdef CONFIG_AP_MODE
 	u8 bmc_tx_rate;
@@ -335,7 +340,7 @@ struct registry_priv {
 	u8 pll_ref_clk_sel;
 
 	/* define for tx power adjust */
-#ifdef CONFIG_TXPWR_LIMIT
+#if CONFIG_TXPWR_LIMIT
 	u8	RegEnableTxPowerLimit;
 #endif
 	u8	RegEnableTxPowerByRate;
@@ -463,6 +468,9 @@ struct registry_priv {
 	u8 tdmadig_mode;
 	u8 tdmadig_dynamic;
 #endif/*CONFIG_TDMADIG*/
+#ifdef CONFIG_RTW_MESH
+	u8 peer_alive_based_preq;
+#endif
 };
 
 /* For registry parameters */
@@ -804,6 +812,7 @@ struct macid_ctl_t {
 	u8 vht_en[MACID_NUM_SW_LIMIT];
 	u32 rate_bmp0[MACID_NUM_SW_LIMIT];
 	u32 rate_bmp1[MACID_NUM_SW_LIMIT];
+	u8 op_num[H2C_MSR_ROLE_MAX]; /* number of macid having h2c_msr's OPMODE = 1 for specific ROLE */
 
 	struct sta_info *sta[MACID_NUM_SW_LIMIT]; /* corresponding stainfo when macid is not shared */
 
@@ -889,7 +898,7 @@ struct rf_ctl_t {
 	u8 highest_ht_rate_bw_bmp;
 	u8 highest_vht_rate_bw_bmp;
 
-#ifdef CONFIG_TXPWR_LIMIT
+#if CONFIG_TXPWR_LIMIT
 	_mutex txpwr_lmt_mutex;
 	_list reg_exc_list;
 	u8 regd_exc_num;
@@ -1083,6 +1092,12 @@ struct dvobj_priv {
 #endif
 
 	struct rf_ctl_t rf_ctl;
+
+#if CONFIG_TX_AC_LIFETIME
+	struct tx_aclt_conf_t tx_aclt_force_val;
+	u8 tx_aclt_flags;
+	struct tx_aclt_conf_t tx_aclt_confs[TX_ACLT_CONF_NUM];
+#endif
 
 	/* For 92D, DMDP have 2 interface. */
 	u8	InterfaceNumber;

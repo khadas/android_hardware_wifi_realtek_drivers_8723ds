@@ -1417,7 +1417,7 @@ static int rtw_wx_set_mode(struct net_device *dev, struct iw_request_info *a,
 		goto exit;
 	}
 
-	if (rtw_set_802_11_infrastructure_mode(padapter, networkType) == _FALSE) {
+	if (rtw_set_802_11_infrastructure_mode(padapter, networkType, 0) == _FALSE) {
 
 		ret = -EPERM;
 		goto exit;
@@ -1816,7 +1816,7 @@ static int rtw_wx_set_wap(struct net_device *dev,
 		src_bssid = temp->sa_data;
 
 		if ((_rtw_memcmp(dst_bssid, src_bssid, ETH_ALEN)) == _TRUE) {
-			if (!rtw_set_802_11_infrastructure_mode(padapter, pnetwork->network.InfrastructureMode)) {
+			if (!rtw_set_802_11_infrastructure_mode(padapter, pnetwork->network.InfrastructureMode, 0)) {
 				ret = -1;
 				_exit_critical_bh(&queue->lock, &irqL);
 				goto cancel_ps_deny;
@@ -2412,7 +2412,7 @@ static int rtw_wx_set_essid(struct net_device *dev,
 						continue;
 				}
 
-				if (rtw_set_802_11_infrastructure_mode(padapter, pnetwork->network.InfrastructureMode) == _FALSE) {
+				if (rtw_set_802_11_infrastructure_mode(padapter, pnetwork->network.InfrastructureMode, 0) == _FALSE) {
 					ret = -1;
 					_exit_critical_bh(&queue->lock, &irqL);
 					goto cancel_ps_deny;
@@ -5790,6 +5790,7 @@ bad:
 
 }
 
+#ifdef CONFIG_MP_INCLUDED
 static int rtw_cta_test_start(struct net_device *dev,
 			      struct iw_request_info *info,
 			      union iwreq_data *wrqu, char *extra)
@@ -5808,7 +5809,7 @@ static int rtw_cta_test_start(struct net_device *dev,
 
 	return ret;
 }
-
+#endif
 extern int rtw_change_ifname(_adapter *padapter, const char *ifname);
 static int rtw_rereg_nd_name(struct net_device *dev,
 			     struct iw_request_info *info,
@@ -11420,7 +11421,7 @@ static s32 initpseudoadhoc(PADAPTER padapter)
 	s32 err;
 
 	networkType = Ndis802_11IBSS;
-	err = rtw_set_802_11_infrastructure_mode(padapter, networkType);
+	err = rtw_set_802_11_infrastructure_mode(padapter, networkType, 0);
 	if (err == _FALSE)
 		return _FAIL;
 
@@ -12179,6 +12180,8 @@ static const struct iw_priv_args rtw_private_args[] = {
 		SIOCIWFIRSTPRIV + 0x17,
 		IW_PRIV_TYPE_CHAR | 1024, IW_PRIV_TYPE_CHAR | 1024 , "rrm"
 	},
+#else
+	{SIOCIWFIRSTPRIV + 0x17, IW_PRIV_TYPE_CHAR | 1024 , 0 , "NULL"},
 #endif
 	{SIOCIWFIRSTPRIV + 0x18, IW_PRIV_TYPE_CHAR | IFNAMSIZ , 0 , "rereg_nd_name"},
 #ifdef CONFIG_MP_INCLUDED

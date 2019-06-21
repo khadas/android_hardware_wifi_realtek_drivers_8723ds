@@ -574,10 +574,11 @@ const char *const _regd_str[] = {
 	"KCC",
 	"ACMA",
 	"CHILE",
+	"MEXICO",
 	"WW",
 };
 
-#ifdef CONFIG_TXPWR_LIMIT
+#if CONFIG_TXPWR_LIMIT
 void _dump_regd_exc_list(void *sel, struct rf_ctl_t *rfctl)
 {
 	struct regd_exc_ent *ent;

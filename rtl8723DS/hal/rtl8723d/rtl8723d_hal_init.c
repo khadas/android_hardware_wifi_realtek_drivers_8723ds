@@ -3127,6 +3127,10 @@ void init_hal_spec_8723d(_adapter *adapter)
 			    | WL_FUNC_TDLS
 			    ;
 
+#if CONFIG_TX_AC_LIFETIME
+	hal_spec->tx_aclt_unit_factor = 8;
+#endif
+
 	hal_spec->pg_txpwr_saddr = 0x10;
 	hal_spec->pg_txgi_diff_factor = 1;
 
@@ -4659,41 +4663,7 @@ u8 SetHwReg8723D(PADAPTER padapter, u8 variable, u8 *val)
 		break;
 
 	case HW_VAR_BASIC_RATE:
-	{
-		struct mlme_ext_info *mlmext_info = &padapter->mlmeextpriv.mlmext_info;
-		u16 input_b = 0, masked = 0, ioted = 0, BrateCfg = 0;
-		u16 rrsr_2g_force_mask = RRSR_CCK_RATES;
-		u16 rrsr_2g_allow_mask = (RRSR_24M | RRSR_12M | RRSR_6M | RRSR_CCK_RATES);
-
-		HalSetBrateCfg(padapter, val, &BrateCfg);
-		input_b = BrateCfg;
-
-		/* apply force and allow mask */
-		BrateCfg |= rrsr_2g_force_mask;
-		BrateCfg &= rrsr_2g_allow_mask;
-		masked = BrateCfg;
-
-#ifdef CONFIG_CMCC_TEST
-		BrateCfg |= (RRSR_11M | RRSR_5_5M | RRSR_1M); /* use 11M to send ACK */
-		BrateCfg |= (RRSR_24M | RRSR_18M | RRSR_12M); /* CMCC_OFDM_ACK 12/18/24M */
-#endif
-
-		/* IOT consideration */
-		if (mlmext_info->assoc_AP_vendor == HT_IOT_PEER_CISCO) {
-			/* if peer is cisco and didn't use ofdm rate, we enable 6M ack */
-			if ((BrateCfg & (RRSR_24M | RRSR_12M | RRSR_6M)) == 0)
-				BrateCfg |= RRSR_6M;
-		}
-		ioted = BrateCfg;
-
-		pHalData->BasicRateSet = BrateCfg;
-
-		RTW_INFO("HW_VAR_BASIC_RATE: %#x->%#x->%#x\n", input_b, masked, ioted);
-
-		/* Set RRSR rate table. */
-		rtw_write16(padapter, REG_RRSR, BrateCfg);
-		rtw_write8(padapter, REG_RRSR + 2, rtw_read8(padapter, REG_RRSR + 2) & 0xf0);
-	}
+		rtw_var_set_basic_rate(padapter, val);	
 		break;
 
 	case HW_VAR_TXPAUSE:
@@ -4738,7 +4708,7 @@ u8 SetHwReg8723D(PADAPTER padapter, u8 variable, u8 *val)
 		regTmp = 0;
 		if (bShortPreamble)
 			regTmp |= 0x80;
-			rtw_write8(padapter, REG_RRSR + 2, regTmp);
+		rtw_write8(padapter, REG_RRSR + 2, regTmp);
 	}
 		break;
 

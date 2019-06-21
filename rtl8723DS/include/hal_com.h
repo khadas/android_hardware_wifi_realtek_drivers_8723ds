@@ -434,8 +434,30 @@ void rtw_iface_disable_tsf_update(_adapter *adapter);
 void rtw_hal_periodic_tsf_update_chk(_adapter *adapter);
 void rtw_hal_periodic_tsf_update_end_timer_hdl(void *ctx);
 
-void hw_var_port_switch(_adapter *adapter);
+#if CONFIG_TX_AC_LIFETIME
+#define TX_ACLT_CONF_DEFAULT	0
+#define TX_ACLT_CONF_AP_M2U		1
+#define TX_ACLT_CONF_MESH		2
+#define TX_ACLT_CONF_NUM		3
 
+extern const char *const _tx_aclt_conf_str[];
+#define tx_aclt_conf_str(conf) (((conf) >= TX_ACLT_CONF_NUM) ? _tx_aclt_conf_str[TX_ACLT_CONF_NUM] : _tx_aclt_conf_str[(conf)])
+
+struct tx_aclt_conf_t {
+	u8 en;
+	u32 vo_vi;
+	u32 be_bk;
+};
+
+void dump_tx_aclt_force_val(void *sel, struct dvobj_priv *dvobj);
+void rtw_hal_set_tx_aclt_force_val(_adapter *adapter, struct tx_aclt_conf_t *input, u8 arg_num);
+void dump_tx_aclt_confs(void *sel, struct dvobj_priv *dvobj);
+void rtw_hal_set_tx_aclt_conf(_adapter *adapter, u8 conf_idx, struct tx_aclt_conf_t *input, u8 arg_num);
+void rtw_hal_update_tx_aclt(_adapter *adapter);
+#endif
+
+void hw_var_port_switch(_adapter *adapter);
+void rtw_var_set_basic_rate(PADAPTER padapter, u8 *val);
 u8 SetHwReg(PADAPTER padapter, u8 variable, u8 *val);
 void GetHwReg(PADAPTER padapter, u8 variable, u8 *val);
 void rtw_hal_check_rxfifo_full(_adapter *adapter);

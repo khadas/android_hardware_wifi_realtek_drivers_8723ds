@@ -47,6 +47,9 @@
 #ifdef CONFIG_MULTIDRV
 #endif
 
+/*feature for all IC*/
+#define RTW_DYNAMIC_RRSR
+
 #ifdef CONFIG_RTL8188E
 	#undef RTL8188E_SUPPORT
 	#undef RATE_ADAPTIVE_SUPPORT

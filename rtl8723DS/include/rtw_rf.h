@@ -162,13 +162,14 @@ typedef enum _REGULATION_TXPWR_LMT {
 	TXPWR_LMT_KCC = 5,
 	TXPWR_LMT_ACMA = 6,
 	TXPWR_LMT_CHILE = 7,
-	TXPWR_LMT_WW = 8, /* smallest of all available limit, keep last */
+	TXPWR_LMT_MEXICO = 8,
+	TXPWR_LMT_WW = 9, /* smallest of all available limit, keep last */
 } REGULATION_TXPWR_LMT;
 
 extern const char *const _regd_str[];
 #define regd_str(regd) (((regd) > TXPWR_LMT_WW) ? _regd_str[TXPWR_LMT_WW] : _regd_str[(regd)])
 
-#ifdef CONFIG_TXPWR_LIMIT
+#if CONFIG_TXPWR_LIMIT
 struct regd_exc_ent {
 	_list list;
 	char country[2];

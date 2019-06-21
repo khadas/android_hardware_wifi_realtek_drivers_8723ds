@@ -2105,7 +2105,7 @@ int rtw_mp_pwrlmt(struct net_device *dev,
 		return -EFAULT;
 
 	*(extra + wrqu->data.length) = '\0';
-#ifdef CONFIG_TXPWR_LIMIT
+#if CONFIG_TXPWR_LIMIT
 	pwrlimtstat = registry_par->RegEnableTxPowerLimit;
 	if (strncmp(extra, "off", 3) == 0 && strlen(extra) < 4) {
 		padapter->registrypriv.RegEnableTxPowerLimit = 0;

@@ -395,7 +395,7 @@ u8 rtw_set_802_11_ssid(_adapter *padapter, NDIS_802_11_SSID *ssid)
 			}
 #ifdef CONFIG_LPS
 			else
-				rtw_lps_ctrl_wk_cmd(padapter, LPS_CTRL_JOINBSS, 1);
+				rtw_lps_ctrl_wk_cmd(padapter, LPS_CTRL_JOINBSS, 0);
 #endif
 		} else {
 
@@ -511,7 +511,7 @@ exit:
 }
 
 u8 rtw_set_802_11_infrastructure_mode(_adapter *padapter,
-			      NDIS_802_11_NETWORK_INFRASTRUCTURE networktype)
+			      NDIS_802_11_NETWORK_INFRASTRUCTURE networktype, u8 flags)
 {
 	_irqL irqL;
 	struct	mlme_priv	*pmlmepriv = &padapter->mlmepriv;
@@ -519,6 +519,7 @@ u8 rtw_set_802_11_infrastructure_mode(_adapter *padapter,
 	NDIS_802_11_NETWORK_INFRASTRUCTURE *pold_state = &(cur_network->network.InfrastructureMode);
 	u8 ap2sta_mode = _FALSE;
 	u8 ret = _TRUE;
+	u8 is_linked = _FALSE, is_adhoc_master = _FALSE;
 
 	if (*pold_state != networktype) {
 		/* RTW_INFO("change mode, old_mode=%d, new_mode=%d, fw_state=0x%x\n", *pold_state, networktype, get_fwstate(pmlmepriv)); */
@@ -535,19 +536,29 @@ u8 rtw_set_802_11_infrastructure_mode(_adapter *padapter,
 		}
 
 		_enter_critical_bh(&pmlmepriv->lock, &irqL);
+		is_linked = check_fwstate(pmlmepriv, _FW_LINKED);
+		is_adhoc_master = check_fwstate(pmlmepriv, WIFI_ADHOC_MASTER_STATE);
 
-		if ((check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE) || (*pold_state == Ndis802_11IBSS))
-			rtw_disassoc_cmd(padapter, 0, 0);
+		/* flags = 0, means enqueue cmd and no wait */
+		if (flags != 0)
+			_exit_critical_bh(&pmlmepriv->lock, &irqL);
 
-		if ((check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE) ||
-		    (check_fwstate(pmlmepriv, WIFI_ADHOC_MASTER_STATE) == _TRUE))
-			rtw_free_assoc_resources_cmd(padapter, _TRUE, 0);
+		if ((is_linked == _TRUE) || (*pold_state == Ndis802_11IBSS))
+			rtw_disassoc_cmd(padapter, 0, flags);
+
+		if ((is_linked == _TRUE) ||
+		    (is_adhoc_master == _TRUE))
+			rtw_free_assoc_resources_cmd(padapter, _TRUE, flags);
 
 		if ((*pold_state == Ndis802_11Infrastructure) || (*pold_state == Ndis802_11IBSS)) {
-			if (check_fwstate(pmlmepriv, _FW_LINKED) == _TRUE) {
+			if (is_linked == _TRUE) {
 				rtw_indicate_disconnect(padapter, 0, _FALSE); /*will clr Linked_state; before this function, we must have checked whether issue dis-assoc_cmd or not*/
 			}
 		}
+
+		/* flags = 0, means enqueue cmd and no wait */
+		if (flags != 0)
+			_enter_critical_bh(&pmlmepriv->lock, &irqL);
 
 		*pold_state = networktype;
 

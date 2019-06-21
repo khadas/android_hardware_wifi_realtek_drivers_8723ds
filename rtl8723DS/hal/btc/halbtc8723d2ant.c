@@ -48,9 +48,9 @@ const char *const glbt_info_src_8723d_2ant[] = {
 	"BT Info[bt auto report]",
 };
 
-u32	glcoex_ver_date_8723d_2ant = 20181130;
-u32	glcoex_ver_8723d_2ant = 0x2e;
-u32	glcoex_ver_btdesired_8723d_2ant = 0x2d;
+u32	glcoex_ver_date_8723d_2ant = 20190530;
+u32	glcoex_ver_8723d_2ant = 0x30;
+u32	glcoex_ver_btdesired_8723d_2ant = 0x2f;
 
 static
 u8 halbtc8723d2ant_bt_rssi_state(IN struct btc_coexist *btcoexist,
@@ -873,9 +873,9 @@ void halbtc8723d2ant_update_wifi_channel_info(IN struct btc_coexist *btcoexist,
 	if (type == BTC_MEDIA_CONNECT && wifi_central_chnl <= 14) {
 		/* enable BT AFH skip WL channel for 8723d
 		 * because BT Rx LO interference
-		 * h2c_parameter[0] = 0x1;
 		 * h2c_parameter[0] = 0x0;
 		 */
+		h2c_parameter[0] = 0x1;
 		h2c_parameter[1] = wifi_central_chnl;
 		btcoexist->btc_get(btcoexist, BTC_GET_U4_WIFI_BW, &wifi_bw);
 		if (wifi_bw == BTC_WIFI_BW_HT40)

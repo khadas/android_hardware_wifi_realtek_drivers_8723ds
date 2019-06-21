@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2017 Realtek Corporation.
+ * Copyright(c) 2007 - 2019 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -96,7 +96,9 @@ void dump_drv_cfg(void *sel)
 #endif
 	RTW_PRINT_SEL(sel, "RTW_DEF_MODULE_REGULATORY_CERT=0x%02x\n", RTW_DEF_MODULE_REGULATORY_CERT);
 
+	RTW_PRINT_SEL(sel, "CONFIG_TXPWR_BY_RATE=%d\n", CONFIG_TXPWR_BY_RATE);
 	RTW_PRINT_SEL(sel, "CONFIG_TXPWR_BY_RATE_EN=%d\n", CONFIG_TXPWR_BY_RATE_EN);
+	RTW_PRINT_SEL(sel, "CONFIG_TXPWR_LIMIT=%d\n", CONFIG_TXPWR_LIMIT);
 	RTW_PRINT_SEL(sel, "CONFIG_TXPWR_LIMIT_EN=%d\n", CONFIG_TXPWR_LIMIT_EN);
 
 
@@ -174,6 +176,9 @@ void dump_drv_cfg(void *sel)
 #endif
 #ifdef CONFIG_RX_AGGREGATION
 	RTW_PRINT_SEL(sel, "CONFIG_RX_AGGREGATION\n");
+#endif
+#ifdef DBG_SDIO
+	RTW_PRINT_SEL(sel, "DBG_SDIO = %d\n", DBG_SDIO);
 #endif
 #endif /*CONFIG_SDIO_HCI*/
 
@@ -710,6 +715,82 @@ void dump_sec_cam_cache(void *sel, _adapter *adapter)
 	}
 
 }
+
+static u8 fwdl_test_chksum_fail = 0;
+static u8 fwdl_test_wintint_rdy_fail = 0;
+
+bool rtw_fwdl_test_trigger_chksum_fail(void)
+{
+	if (fwdl_test_chksum_fail) {
+		RTW_PRINT("fwdl test case: trigger chksum_fail\n");
+		fwdl_test_chksum_fail--;
+		return _TRUE;
+	}
+	return _FALSE;
+}
+
+bool rtw_fwdl_test_trigger_wintint_rdy_fail(void)
+{
+	if (fwdl_test_wintint_rdy_fail) {
+		RTW_PRINT("fwdl test case: trigger wintint_rdy_fail\n");
+		fwdl_test_wintint_rdy_fail--;
+		return _TRUE;
+	}
+	return _FALSE;
+}
+
+static u8 del_rx_ampdu_test_no_tx_fail = 0;
+
+bool rtw_del_rx_ampdu_test_trigger_no_tx_fail(void)
+{
+	if (del_rx_ampdu_test_no_tx_fail) {
+		RTW_PRINT("del_rx_ampdu test case: trigger no_tx_fail\n");
+		del_rx_ampdu_test_no_tx_fail--;
+		return _TRUE;
+	}
+	return _FALSE;
+}
+
+static u32 g_wait_hiq_empty_ms = 0;
+
+u32 rtw_get_wait_hiq_empty_ms(void)
+{
+	return g_wait_hiq_empty_ms;
+}
+
+static systime sta_linking_test_start_time = 0;
+static u32 sta_linking_test_wait_ms = 0;
+static u8 sta_linking_test_force_fail = 0;
+
+void rtw_sta_linking_test_set_start(void)
+{
+	sta_linking_test_start_time = rtw_get_current_time();
+}
+
+bool rtw_sta_linking_test_wait_done(void)
+{
+	return rtw_get_passing_time_ms(sta_linking_test_start_time) >= sta_linking_test_wait_ms;
+}
+
+bool rtw_sta_linking_test_force_fail(void)
+{
+	return sta_linking_test_force_fail;
+}
+
+#ifdef CONFIG_AP_MODE
+static u16 ap_linking_test_force_auth_fail = 0;
+static u16 ap_linking_test_force_asoc_fail = 0;
+
+u16 rtw_ap_linking_test_force_auth_fail(void)
+{
+	return ap_linking_test_force_auth_fail;
+}
+
+u16 rtw_ap_linking_test_force_asoc_fail(void)
+{
+	return ap_linking_test_force_asoc_fail;
+}
+#endif
 
 #ifdef CONFIG_PROC_DEBUG
 ssize_t proc_set_write_reg(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
@@ -2028,29 +2109,6 @@ ssize_t proc_set_rx_cnt_dump(struct file *file, const char __user *buffer, size_
 }
 #endif
 
-static u8 fwdl_test_chksum_fail = 0;
-static u8 fwdl_test_wintint_rdy_fail = 0;
-
-bool rtw_fwdl_test_trigger_chksum_fail(void)
-{
-	if (fwdl_test_chksum_fail) {
-		RTW_PRINT("fwdl test case: trigger chksum_fail\n");
-		fwdl_test_chksum_fail--;
-		return _TRUE;
-	}
-	return _FALSE;
-}
-
-bool rtw_fwdl_test_trigger_wintint_rdy_fail(void)
-{
-	if (fwdl_test_wintint_rdy_fail) {
-		RTW_PRINT("fwdl test case: trigger wintint_rdy_fail\n");
-		fwdl_test_wintint_rdy_fail--;
-		return _TRUE;
-	}
-	return _FALSE;
-}
-
 ssize_t proc_set_fwdl_test_case(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
 {
 	char tmp[32];
@@ -2067,18 +2125,6 @@ ssize_t proc_set_fwdl_test_case(struct file *file, const char __user *buffer, si
 		sscanf(tmp, "%hhu %hhu", &fwdl_test_chksum_fail, &fwdl_test_wintint_rdy_fail);
 
 	return count;
-}
-
-static u8 del_rx_ampdu_test_no_tx_fail = 0;
-
-bool rtw_del_rx_ampdu_test_trigger_no_tx_fail(void)
-{
-	if (del_rx_ampdu_test_no_tx_fail) {
-		RTW_PRINT("del_rx_ampdu test case: trigger no_tx_fail\n");
-		del_rx_ampdu_test_no_tx_fail--;
-		return _TRUE;
-	}
-	return _FALSE;
 }
 
 ssize_t proc_set_del_rx_ampdu_test_case(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
@@ -2099,13 +2145,6 @@ ssize_t proc_set_del_rx_ampdu_test_case(struct file *file, const char __user *bu
 	return count;
 }
 
-static u32 g_wait_hiq_empty_ms = 0;
-
-u32 rtw_get_wait_hiq_empty_ms(void)
-{
-	return g_wait_hiq_empty_ms;
-}
-
 ssize_t proc_set_wait_hiq_empty(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
 {
 	char tmp[32];
@@ -2122,25 +2161,6 @@ ssize_t proc_set_wait_hiq_empty(struct file *file, const char __user *buffer, si
 		sscanf(tmp, "%u", &g_wait_hiq_empty_ms);
 
 	return count;
-}
-
-static systime sta_linking_test_start_time = 0;
-static u32 sta_linking_test_wait_ms = 0;
-static u8 sta_linking_test_force_fail = 0;
-
-void rtw_sta_linking_test_set_start(void)
-{
-	sta_linking_test_start_time = rtw_get_current_time();
-}
-
-bool rtw_sta_linking_test_wait_done(void)
-{
-	return rtw_get_passing_time_ms(sta_linking_test_start_time) >= sta_linking_test_wait_ms;
-}
-
-bool rtw_sta_linking_test_force_fail(void)
-{
-	return sta_linking_test_force_fail;
 }
 
 ssize_t proc_set_sta_linking_test(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
@@ -2170,19 +2190,6 @@ ssize_t proc_set_sta_linking_test(struct file *file, const char __user *buffer, 
 }
 
 #ifdef CONFIG_AP_MODE
-static u16 ap_linking_test_force_auth_fail = 0;
-static u16 ap_linking_test_force_asoc_fail = 0;
-
-u16 rtw_ap_linking_test_force_auth_fail(void)
-{
-	return ap_linking_test_force_auth_fail;
-}
-
-u16 rtw_ap_linking_test_force_asoc_fail(void)
-{
-	return ap_linking_test_force_asoc_fail;
-}
-
 ssize_t proc_set_ap_linking_test(struct file *file, const char __user *buffer, size_t count, loff_t *pos, void *data)
 {
 	char tmp[32];

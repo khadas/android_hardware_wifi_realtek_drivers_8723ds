@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2007 - 2017 Realtek Corporation.
+ * Copyright(c) 2007 - 2019 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -333,6 +333,106 @@ void dump_sdio_card_info(void *sel, struct dvobj_priv *dvobj)
 
 #define SDIO_CARD_INFO_DUMP(dvobj)	dump_sdio_card_info(RTW_DBGDUMP, dvobj)
 
+#ifdef DBG_SDIO
+#if (DBG_SDIO >= 2)
+void rtw_sdio_dbg_reg_free(struct dvobj_priv *d)
+{
+	struct sdio_data *sdio;
+	u8 *buf;
+	u32 size;
+
+
+	sdio = &d->intf_data;
+
+	buf = sdio->dbg_msg;
+	size = sdio->dbg_msg_size;
+	if (buf){
+		sdio->dbg_msg = NULL;
+		sdio->dbg_msg_size = 0;
+		rtw_mfree(buf, size);
+	}
+
+	buf = sdio->reg_mac;
+	if (buf) {
+		sdio->reg_mac = NULL;
+		rtw_mfree(buf, 0x800);
+	}
+
+	buf = sdio->reg_mac_ext;
+	if (buf) {
+		sdio->reg_mac_ext = NULL;
+		rtw_mfree(buf, 0x800);
+	}
+
+	buf = sdio->reg_local;
+	if (buf) {
+		sdio->reg_local = NULL;
+		rtw_mfree(buf, 0x100);
+	}
+
+	buf = sdio->reg_cia;
+	if (buf) {
+		sdio->reg_cia = NULL;
+		rtw_mfree(buf, 0x200);
+	}
+}
+
+void rtw_sdio_dbg_reg_alloc(struct dvobj_priv *d)
+{
+	struct sdio_data *sdio;
+	u8 *buf;
+
+
+	sdio = &d->intf_data;
+
+	buf = _rtw_zmalloc(0x800);
+	if (buf)
+		sdio->reg_mac = buf;
+
+	buf = _rtw_zmalloc(0x800);
+	if (buf)
+		sdio->reg_mac_ext = buf;
+
+	buf = _rtw_zmalloc(0x100);
+	if (buf)
+		sdio->reg_local = buf;
+
+	buf = _rtw_zmalloc(0x200);
+	if (buf)
+		sdio->reg_cia = buf;
+}
+#endif /* DBG_SDIO >= 2 */
+
+static void sdio_dbg_init(struct dvobj_priv *d)
+{
+	struct sdio_data *sdio;
+
+
+	sdio = &d->intf_data;
+
+	sdio->cmd52_err_cnt = 0;
+	sdio->cmd53_err_cnt = 0;
+
+#if (DBG_SDIO >= 1)
+	sdio->reg_dump_mark = 0;
+#endif /* DBG_SDIO >= 1 */
+
+#if (DBG_SDIO >= 3)
+	sdio->dbg_enable = 0;
+	sdio->err_stop = 0;
+	sdio->err_test = 0;
+	sdio->err_test_triggered = 0;
+#endif /* DBG_SDIO >= 3 */
+}
+
+static void sdio_dbg_deinit(struct dvobj_priv *d)
+{
+#if (DBG_SDIO >= 2)
+	rtw_sdio_dbg_reg_free(d);
+#endif /* DBG_SDIO >= 2 */
+}
+#endif /* DBG_SDIO */
+
 u32 sdio_init(struct dvobj_priv *dvobj)
 {
 	PSDIO_DATA psdio_data;
@@ -377,6 +477,11 @@ u32 sdio_init(struct dvobj_priv *dvobj)
 	)
 		psdio_data->sd3_bus_mode = _TRUE;
 #endif
+
+#ifdef DBG_SDIO
+	sdio_dbg_init(dvobj);
+#endif /* DBG_SDIO */
+
 	SDIO_CARD_INFO_DUMP(dvobj);
 
 
@@ -409,6 +514,10 @@ void sdio_deinit(struct dvobj_priv *dvobj)
 
 		sdio_release_host(func);
 	}
+
+#ifdef DBG_SDIO
+	sdio_dbg_deinit(dvobj);
+#endif /* DBG_SDIO */
 }
 
 static void rtw_decide_chip_type_by_device_id(struct dvobj_priv *dvobj, const struct sdio_device_id  *pdid)

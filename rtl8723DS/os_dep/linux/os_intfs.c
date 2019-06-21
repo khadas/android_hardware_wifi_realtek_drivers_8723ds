@@ -169,6 +169,31 @@ int rtw_uapsd_ac_enable = 0x0;
 	int rtw_pwrtrim_enable = 0; /* Default Enalbe  power trim by efuse config */
 #endif
 
+#if CONFIG_TX_AC_LIFETIME
+uint rtw_tx_aclt_flags = CONFIG_TX_ACLT_FLAGS;
+module_param(rtw_tx_aclt_flags, uint, 0644);
+MODULE_PARM_DESC(rtw_tx_aclt_flags, "device TX AC queue packet lifetime control flags");
+
+static uint rtw_tx_aclt_conf_default[3] = CONFIG_TX_ACLT_CONF_DEFAULT;
+static uint rtw_tx_aclt_conf_default_num = 0;
+module_param_array(rtw_tx_aclt_conf_default, uint, &rtw_tx_aclt_conf_default_num, 0644);
+MODULE_PARM_DESC(rtw_tx_aclt_conf_default, "device TX AC queue lifetime config for default status");
+
+#ifdef CONFIG_TX_MCAST2UNI
+static uint rtw_tx_aclt_conf_ap_m2u[3] = CONFIG_TX_ACLT_CONF_AP_M2U;
+static uint rtw_tx_aclt_conf_ap_m2u_num = 0;
+module_param_array(rtw_tx_aclt_conf_ap_m2u, uint, &rtw_tx_aclt_conf_ap_m2u_num, 0644);
+MODULE_PARM_DESC(rtw_tx_aclt_conf_ap_m2u, "device TX AC queue lifetime config for AP mode M2U status");
+#endif
+
+#ifdef CONFIG_RTW_MESH
+static uint rtw_tx_aclt_conf_mesh[3] = CONFIG_TX_ACLT_CONF_MESH;
+static uint rtw_tx_aclt_conf_mesh_num = 0;
+module_param_array(rtw_tx_aclt_conf_mesh, uint, &rtw_tx_aclt_conf_mesh_num, 0644);
+MODULE_PARM_DESC(rtw_tx_aclt_conf_mesh, "device TX AC queue lifetime config for MESH status");
+#endif
+#endif /* CONFIG_TX_AC_LIFETIME */
+
 uint rtw_tx_bw_mode = 0x21;
 module_param(rtw_tx_bw_mode, uint, 0644);
 MODULE_PARM_DESC(rtw_tx_bw_mode, "The max tx bw for 2.4G and 5G. format is the same as rtw_bw_mode");
@@ -612,7 +637,7 @@ int rtw_tx_pwr_by_rate = CONFIG_TXPWR_BY_RATE_EN;
 module_param(rtw_tx_pwr_by_rate, int, 0644);
 MODULE_PARM_DESC(rtw_tx_pwr_by_rate, "0:Disable, 1:Enable, 2: Depend on efuse");
 
-#ifdef CONFIG_TXPWR_LIMIT
+#if CONFIG_TXPWR_LIMIT
 int rtw_tx_pwr_lmt_enable = CONFIG_TXPWR_LIMIT_EN;
 module_param(rtw_tx_pwr_lmt_enable, int, 0644);
 MODULE_PARM_DESC(rtw_tx_pwr_lmt_enable, "0:Disable, 1:Enable, 2: Depend on efuse");
@@ -721,6 +746,13 @@ MODULE_PARM_DESC(rtw_dynamic_soml_delay, "SOML training delay");
 #endif
 
 
+#ifdef CONFIG_RTW_MESH
+uint rtw_peer_alive_based_preq = 1;
+module_param(rtw_peer_alive_based_preq, uint, 0644);
+MODULE_PARM_DESC(rtw_peer_alive_based_preq,
+	"On demand PREQ will reference peer alive status. 0: Off, 1: On");
+#endif
+
 int _netdev_open(struct net_device *pnetdev);
 int netdev_open(struct net_device *pnetdev);
 static int netdev_close(struct net_device *pnetdev);
@@ -823,6 +855,39 @@ module_param(rtw_wakeup_event, uint, 0644);
  */
 uint rtw_suspend_type = RTW_SUSPEND_TYPE;
 module_param(rtw_suspend_type, uint, 0644);
+#endif
+
+#if CONFIG_TX_AC_LIFETIME
+static void rtw_regsty_load_tx_ac_lifetime(struct registry_priv *regsty)
+{
+	int i, j;
+	struct tx_aclt_conf_t *conf;
+	uint *parm;
+
+	regsty->tx_aclt_flags = (u8)rtw_tx_aclt_flags;
+
+	for (i = 0; i < TX_ACLT_CONF_NUM; i++) {
+		conf = &regsty->tx_aclt_confs[i];
+		if (i == TX_ACLT_CONF_DEFAULT)
+			parm = rtw_tx_aclt_conf_default;
+		#ifdef CONFIG_TX_MCAST2UNI
+		else if (i == TX_ACLT_CONF_AP_M2U)
+			parm = rtw_tx_aclt_conf_ap_m2u;
+		#endif
+		#ifdef CONFIG_RTW_MESH
+		else if (i == TX_ACLT_CONF_MESH)
+			parm = rtw_tx_aclt_conf_mesh;
+		#endif
+		else
+			parm = NULL;
+
+		if (parm) {
+			conf->en = parm[0] & 0xF;
+			conf->vo_vi = parm[1];
+			conf->be_bk = parm[2];
+		}	
+	}
+}
 #endif
 
 void rtw_regsty_load_target_tx_power(struct registry_priv *regsty)
@@ -976,6 +1041,10 @@ uint loadparam(_adapter *padapter)
 
 	registry_par->RegPwrTrimEnable = (u8)rtw_pwrtrim_enable;
 
+#if CONFIG_TX_AC_LIFETIME
+	rtw_regsty_load_tx_ac_lifetime(registry_par);
+#endif
+
 	registry_par->tx_bw_mode = (u8)rtw_tx_bw_mode;
 
 #ifdef CONFIG_80211N_HT
@@ -1098,7 +1167,7 @@ uint loadparam(_adapter *padapter)
 #endif
 	registry_par->pll_ref_clk_sel = (u8)rtw_pll_ref_clk_sel;
 
-#ifdef CONFIG_TXPWR_LIMIT
+#if CONFIG_TXPWR_LIMIT
 	registry_par->RegEnableTxPowerLimit = (u8)rtw_tx_pwr_lmt_enable;
 #endif
 	registry_par->RegEnableTxPowerByRate = (u8)rtw_tx_pwr_by_rate;
@@ -1217,7 +1286,9 @@ uint loadparam(_adapter *padapter)
 #ifdef CONFIG_FW_HANDLE_TXBCN
 	registry_par->fw_tbtt_rpt = rtw_tbtt_rpt;
 #endif
-
+#ifdef CONFIG_RTW_MESH
+	registry_par->peer_alive_based_preq = rtw_peer_alive_based_preq;
+#endif
 	return status;
 }
 
@@ -1359,7 +1430,11 @@ unsigned int rtw_classify8021d(struct sk_buff *skb)
 
 static u16 rtw_select_queue(struct net_device *dev, struct sk_buff *skb
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0)
+	#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 19, 0)
+	, struct net_device *sb_dev
+	#else
 	, void *accel_priv
+	#endif
 	#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)
 	, select_queue_fallback_t fallback
 	#endif
@@ -2361,6 +2436,38 @@ u8 rtw_init_drv_sw(_adapter *padapter)
 	padapter->client_id = MAX_CLIENT_PORT_NUM;
 	padapter->client_port = CLT_PORT_INVALID;
 	#endif
+
+	if (is_primary_adapter(padapter)) {
+		struct dvobj_priv *dvobj = adapter_to_dvobj(padapter);
+		struct hal_spec_t *hal_spec = GET_HAL_SPEC(padapter);
+
+		dvobj->macid_ctl.num = rtw_min(hal_spec->macid_num, MACID_NUM_SW_LIMIT);
+
+		dvobj->cam_ctl.sec_cap = hal_spec->sec_cap;
+		dvobj->cam_ctl.num = rtw_min(hal_spec->sec_cam_ent_num, SEC_CAM_ENT_NUM_SW_LIMIT);
+
+		#if CONFIG_TX_AC_LIFETIME
+		{
+			struct registry_priv *regsty = adapter_to_regsty(padapter);
+			int i;
+
+			dvobj->tx_aclt_flags = regsty->tx_aclt_flags;
+			for (i = 0; i < TX_ACLT_CONF_NUM; i++) {
+				dvobj->tx_aclt_confs[i].en = regsty->tx_aclt_confs[i].en;
+				dvobj->tx_aclt_confs[i].vo_vi
+					= regsty->tx_aclt_confs[i].vo_vi / (hal_spec->tx_aclt_unit_factor * 32);
+				if (dvobj->tx_aclt_confs[i].vo_vi > 0xFFFF)
+					dvobj->tx_aclt_confs[i].vo_vi = 0xFFFF;
+				dvobj->tx_aclt_confs[i].be_bk
+					= regsty->tx_aclt_confs[i].be_bk / (hal_spec->tx_aclt_unit_factor * 32);
+				if (dvobj->tx_aclt_confs[i].be_bk > 0xFFFF)
+					dvobj->tx_aclt_confs[i].be_bk = 0xFFFF;
+			}
+
+			dvobj->tx_aclt_force_val.en = 0xFF;
+		}
+		#endif
+	}
 
 	ret8 = rtw_init_default_value(padapter);
 
@@ -5136,7 +5243,7 @@ int rtw_resume_common(_adapter *padapter)
 	RTW_PRINT("resume start\n");
 	RTW_INFO("==> %s (%s:%d)\n", __FUNCTION__, current->comm, current->pid);
 
-	if (rtw_mi_check_status(padapter, WIFI_AP_STATE) == _FALSE) {
+	if (rtw_mi_check_status(padapter, MI_AP_MODE) == _FALSE) {
 #ifdef CONFIG_WOWLAN
 		if (pwrpriv->wowlan_mode == _TRUE)
 			rtw_resume_process_wow(padapter);
@@ -5144,7 +5251,7 @@ int rtw_resume_common(_adapter *padapter)
 #endif
 			rtw_resume_process_normal(padapter);
 
-	} else if (rtw_mi_check_status(padapter, WIFI_AP_STATE)) {
+	} else if (rtw_mi_check_status(padapter, MI_AP_MODE)) {
 #ifdef CONFIG_AP_WOWLAN
 		rtw_resume_process_ap_wow(padapter);
 #else

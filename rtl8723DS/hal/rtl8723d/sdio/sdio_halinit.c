@@ -501,7 +501,12 @@ void _InitAdaptiveCtrl(PADAPTER padapter)
 	value32 = rtw_read32(padapter, REG_RRSR);
 	value32 &= ~RATE_BITMAP_ALL;
 	value32 |= RATE_RRSR_CCK_ONLY_1M;
-	rtw_write32(padapter, REG_RRSR, value32);
+
+	#ifdef RTW_DYNAMIC_RRSR
+		rtw_phydm_set_rrsr(padapter, value32, TRUE);
+	#else
+		rtw_write32(padapter, REG_RRSR, value32);
+	#endif
 
 	/* CF-END Threshold */
 	/* m_spIoBase->rtw_write8(REG_CFEND_TH, 0x1); */
@@ -1071,22 +1076,6 @@ static u32 rtl8723ds_hal_init(PADAPTER padapter)
 	/* YJ,TODO */
 	rtw_write8(padapter, REG_SECONDARY_CCA_CTRL_8723D, 0x3);	/* CCA */
 	rtw_write8(padapter, 0x976, 0);	/* hpfan_todo: 2nd CCA related */
-
-#if defined(CONFIG_CONCURRENT_MODE) || defined(CONFIG_TX_MCAST2UNI)
-
-#ifdef CONFIG_CHECK_AC_LIFETIME
-	/* Enable lifetime check for the four ACs */
-	rtw_write8(padapter, REG_LIFETIME_CTRL, rtw_read8(padapter, REG_LIFETIME_CTRL) | 0x0F);
-#endif /* CONFIG_CHECK_AC_LIFETIME */
-
-#ifdef CONFIG_TX_MCAST2UNI
-	rtw_write16(padapter, REG_PKT_VO_VI_LIFE_TIME, 0x0400);	/* unit: 256us. 256ms */
-	rtw_write16(padapter, REG_PKT_BE_BK_LIFE_TIME, 0x0400);	/* unit: 256us. 256ms */
-#else	/* CONFIG_TX_MCAST2UNI */
-	rtw_write16(padapter, REG_PKT_VO_VI_LIFE_TIME, 0x3000);	/* unit: 256us. 3s */
-	rtw_write16(padapter, REG_PKT_BE_BK_LIFE_TIME, 0x3000);	/* unit: 256us. 3s */
-#endif /* CONFIG_TX_MCAST2UNI */
-#endif /* CONFIG_CONCURRENT_MODE || CONFIG_TX_MCAST2UNI */
 
 	_BBTurnOnBlock(padapter);
 

@@ -776,6 +776,26 @@ void rtw_hal_turbo_edca(_adapter *adapter)
 
 }
 
+s8 rtw_dm_get_min_rssi(_adapter *adapter)
+{
+	struct macid_ctl_t *macid_ctl = adapter_to_macidctl(adapter);
+	struct sta_info *sta;
+	s8 min_rssi = 127, rssi;
+	int i;
+
+	for (i = 0; i < MACID_NUM_SW_LIMIT; i++) {
+		sta = macid_ctl->sta[i];
+		if (!sta || !GET_H2CCMD_MSRRPT_PARM_OPMODE(macid_ctl->h2c_msr + i)
+			|| is_broadcast_mac_addr(sta->cmn.mac_addr))
+			continue;
+		rssi = sta->cmn.rssi_stat.rssi;
+		if (rssi >= 0 && min_rssi > rssi)
+			min_rssi = rssi;
+	}
+
+	return min_rssi == 127 ? 0 : min_rssi;
+}
+
 s8 rtw_phydm_get_min_rssi(_adapter *adapter)
 {
 	struct dm_struct *phydm = adapter_to_phydm(adapter);
@@ -792,6 +812,15 @@ u8 rtw_phydm_get_cur_igi(_adapter *adapter)
 
 	cur_igi = phydm_cmn_info_query(phydm, (enum phydm_info_query) PHYDM_INFO_CURR_IGI);
 	return cur_igi;
+}
+
+bool rtw_phydm_get_edcca_flag(_adapter *adapter)
+{
+	struct dm_struct *phydm = adapter_to_phydm(adapter);
+	bool cur_edcca_flag = 0;
+
+	cur_edcca_flag = phydm_cmn_info_query(phydm, (enum phydm_info_query) PHYDM_INFO_EDCCA_FLAG);
+	return cur_edcca_flag;
 }
 
 u32 rtw_phydm_get_phy_cnt(_adapter *adapter, enum phy_cnt cnt)
@@ -907,7 +936,8 @@ void SetHalODMVar(
 		rssi_min = rtw_phydm_get_min_rssi(Adapter);
 
 		_RTW_PRINT_SEL(sel, "============ Rx Info dump ===================\n");
-		_RTW_PRINT_SEL(sel, "is_linked = %d, rssi_min = %d(%%), current_igi = 0x%x\n", podmpriv->is_linked, rssi_min, cur_igi);
+		_RTW_PRINT_SEL(sel, "is_linked = %d, rssi_min = %d(%%)(%d(%%)), current_igi = 0x%x\n"
+			, podmpriv->is_linked, rssi_min, rtw_dm_get_min_rssi(Adapter), cur_igi);
 		_RTW_PRINT_SEL(sel, "cnt_cck_fail = %d, cnt_ofdm_fail = %d, Total False Alarm = %d\n",
 			rtw_phydm_get_phy_cnt(Adapter, FA_CCK),
 			rtw_phydm_get_phy_cnt(Adapter, FA_OFDM),
@@ -1137,21 +1167,14 @@ void rtw_phydm_watchdog_in_lps_lclk(_adapter *adapter)
 {
 	struct mlme_priv	*pmlmepriv = &adapter->mlmepriv;
 	struct sta_priv *pstapriv = &adapter->stapriv;
-	struct sta_info *psta = NULL;
 	u8 cur_igi = 0;
 	s8 min_rssi = 0;
 
 	if (!rtw_is_hw_init_completed(adapter))
 		return;
 
-	psta = rtw_get_stainfo(pstapriv, get_bssid(pmlmepriv));
-	if (psta == NULL)
-		return;
-
 	cur_igi = rtw_phydm_get_cur_igi(adapter);
-	min_rssi = rtw_phydm_get_min_rssi(adapter);
-	if (min_rssi <= 0)
-		min_rssi = psta->cmn.rssi_stat.rssi;
+	min_rssi = rtw_dm_get_min_rssi(adapter);
 	/*RTW_INFO("%s "ADPT_FMT" cur_ig_value=%d, min_rssi = %d\n", __func__,  ADPT_ARG(adapter), cur_igi, min_rssi);*/
 
 	if (min_rssi <= 0)
@@ -1508,7 +1531,17 @@ void rtw_dyn_soml_config(_adapter *adapter)
 }
 #endif
 
+#ifdef RTW_DYNAMIC_RRSR
+void rtw_phydm_set_rrsr(_adapter *adapter, u32 rrsr_value, bool write_rrsr)
+{
 
+	struct dm_struct *phydm = adapter_to_phydm(adapter);
+
+	odm_cmn_info_update(phydm, ODM_CMNINFO_RRSR_VAL, rrsr_value);
+	if(write_rrsr)
+		phydm_rrsr_set_register(phydm, rrsr_value);
+}
+#endif/*RTW_DYNAMIC_RRSR*/
 void rtw_phydm_read_efuse(_adapter *adapter)
 {
 	PHAL_DATA_TYPE hal_data = GET_HAL_DATA(adapter);
