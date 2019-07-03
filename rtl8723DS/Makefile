@@ -7,7 +7,7 @@ EXTRA_CFLAGS += -O1
 #EXTRA_CFLAGS += -pedantic
 #EXTRA_CFLAGS += -Wshadow -Wpointer-arith -Wcast-qual -Wstrict-prototypes -Wmissing-prototypes
 ifndef CONFIG_KASAN
-KBUILD_CFLAGS_MODULE += -Wlarger-than=30000 \
+KBUILD_CFLAGS_MODULE += -Wlarger-than=40000 \
                        -Wframe-larger-than=1024
 endif
 EXTRA_CFLAGS += -Wno-unused-variable
